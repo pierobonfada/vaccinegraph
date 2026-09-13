@@ -339,42 +339,51 @@ def generate_complications_chart(df, title, output_file=None):
         eprint("ERRO: Nenhum dado de complicacao para plotar.")
         sys.exit(1)
         
-    fig, ax = plt.subplots(figsize=(14, 8))
+    fig, ax1 = plt.subplots(figsize=(15, 8))
+    fig.patch.set_facecolor('#f8f9fa')
+    ax1.set_facecolor('#ffffff')
     
-    # Nested bars (Outer: Doses, Inner: Complications)
     x = range(len(df['vaccine']))
     
-    # Outer bar (Blue)
-    bars_doses = ax.bar(x, df['total_doses'], width=0.8, color='#3498db', label='Doses Aplicadas')
-    # Inner bar (Red)
-    bars_comps = ax.bar(x, df['total_complications'], width=0.4, color='#e74c3c', label='Complicações (EAPV)')
+    color_doses = '#bdc3c7'
+    bars_doses = ax1.bar(x, df['total_doses'], width=0.7, color=color_doses, label='Doses Aplicadas', alpha=0.7)
     
-    # Using Log Scale so both millions of doses and hundreds of complications are visible
-    ax.set_yscale('log')
+    ax2 = ax1.twinx()
+    color_comps = '#e74c3c'
+    bars_comps = ax2.bar(x, df['total_complications'], width=0.35, color=color_comps, label='Complicações (VigiMed)')
     
-    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
-    ax.set_xticks(x)
-    ax.set_xticklabels(df['vaccine'], rotation=45, ha='right', fontsize=10)
-    ax.set_ylabel('Quantidade (Escala Logarítmica)', fontsize=12)
+    ax1.set_ylabel('Total de Doses Aplicadas', color='#7f8c8d', fontsize=12, fontweight='bold')
+    ax2.set_ylabel('Número de Complicações Notificadas', color=color_comps, fontsize=12, fontweight='bold')
     
-    # Add values on top of the bars
+    ax1.tick_params(axis='y', labelcolor='#7f8c8d')
+    ax1.yaxis.set_major_formatter(FuncFormatter(format_millions))
+    ax2.tick_params(axis='y', labelcolor=color_comps)
+    
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(df['vaccine'], rotation=40, ha='right', fontsize=11, fontweight='bold')
+    
+    ax1.spines['top'].set_visible(False)
+    ax2.spines['top'].set_visible(False)
+    ax1.grid(True, axis='y', linestyle='--', alpha=0.4, color='#bdc3c7')
+    
     for i, (dose, comp, pct) in enumerate(zip(df['total_doses'], df['total_complications'], df['pct_complications'])):
         dose_str = f'{int(dose):,}'.replace(',', '.')
         comp_str = f'{int(comp):,}'.replace(',', '.')
         
-        # Annotate doses
-        ax.annotate(f'D: {dose_str}', (i, dose), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#2980b9', xytext=(0, 2), textcoords='offset points')
-        # Annotate complications
-        ax.annotate(f'C: {comp_str}\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#c0392b', xytext=(0, 2), textcoords='offset points')
+        ax1.annotate(f'{dose_str}\\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
+        ax2.annotate(f'{comp_str}\\nCasos\\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
         
-    # Legend
-    ax.legend(loc='upper right', fontsize=12)
-    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+    ylim1 = ax1.get_ylim()
+    ax1.set_ylim(ylim1[0], ylim1[1] * 1.25)
+    ylim2 = ax2.get_ylim()
+    ax2.set_ylim(ylim2[0], ylim2[1] * 1.25)
     
-    ylim = ax.get_ylim()
-    ax.set_ylim(ylim[0], ylim[1] * 5) # Expand log scale ceiling for annotations
+    fig.legend(loc='upper center', bbox_to_anchor=(0.5, 0.93), ncol=2, frameon=False, fontsize=12)
     
-    plt.tight_layout()
+    plt.suptitle(title, fontsize=16, fontweight='black', color='#2c3e50', y=0.98)
+    ax1.set_title("ATENÇÃO: Este gráfico possui DUAS escalas lineares independentes (Eixo Esq = Doses | Eixo Dir = Casos)", fontsize=10, color='#e67e22', style='italic', pad=30)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.92])
     handle_output(fig, output_file)
 
 def generate_profile_chart(df, title, output_file=None):
