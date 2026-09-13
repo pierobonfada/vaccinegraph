@@ -498,6 +498,8 @@ def main():
     parser.add_argument('--state', type=str, nargs='+', help='Estados para filtrar (ex: RS SP).')
     parser.add_argument('--city', type=str, nargs='+', help='Codigos IBGE de municipios (6 digitos).')
     parser.add_argument('-o', '--output', type=str, help='Arquivo de saida para a imagem PNG. (Salvo na pasta output/)')
+    parser.add_argument('--severity', choices=['all', 'mild', 'severe', 'death'], default='all', help='Filtrar gravidade das complicacoes (VigiMed)')
+    parser.add_argument('--sort', choices=['most_complications', 'least_complications', 'most_doses'], default='most_complications', help='Criterio de ordenacao')
     
     args = parser.parse_args()
     
