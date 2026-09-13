@@ -297,7 +297,6 @@ def get_vigimed_data(severity):
         
     eprint(f">> Processando Notificacoes VigiMed via Pandas (Filtro: {severity})")
     try:
-        import pandas as pd
         df_raw = pd.read_csv(vigimed_path, sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
     except Exception as e:
         eprint(f"ERRO ao ler VigiMed CSV via pandas: {e}")
@@ -333,7 +332,9 @@ def generate_complications_chart(df, title, output_file=None):
     
     x = range(len(df['vaccine']))
     
-    bars_doses = ax.bar(x, df['total_doses'], width=0.8, color='#bdc3c7', edgecolor='#95a5a6', label='Doses Aplicadas')
+    color_doses = df.get('color', '#bdc3c7')
+    color_doses = df.get('color', '#bdc3c7')
+    bars_doses = ax.bar(x, df['total_doses'], width=0.8, color=color_doses, edgecolor='#95a5a6', label='Doses Aplicadas')
     bars_comps = ax.bar(x, df['total_complications'], width=0.4, color='#e74c3c', label='Complicações (VigiMed)')
     
     ax.set_yscale('log')
@@ -351,7 +352,9 @@ def generate_complications_chart(df, title, output_file=None):
         dose_str = f'{int(dose):,}'.replace(',', '.')
         comp_str = f'{int(comp):,}'.replace(',', '.')
         
-        ax.annotate(f'{dose_str}\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
+        color_text = '#27ae60' if df.get('is_searched', __import__('pandas').Series([False]*len(df))).iloc[i] else '#7f8c8d'
+        color_text = '#27ae60' if df.get('is_searched', pd.Series([False]*len(df))).iloc[i] else '#7f8c8d'
+        ax.annotate(f'{dose_str}\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color=color_text, xytext=(0, 3), textcoords='offset points')
         ax.annotate(f'{comp_str}\nCasos\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
         
     ylim = ax.get_ylim()
@@ -597,20 +600,18 @@ def main():
             
         # Calculate percentage
         df_merged['pct_complications'] = (df_merged['total_complications'] / df_merged['total_doses']) * 100
+
+        sort_col_map = {
+            'most_complications': 'pct_complications',
+            'least_complications': 'pct_complications',
+            'most_doses': 'total_doses'
+        }
+        sort_col = sort_col_map.get(args.sort, 'pct_complications')
         
-        if args.search:
-            search_terms = [s.lower() for s in args.search]
-            df_merged = df_merged[df_merged['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
-        else:
-            if args.sort == 'most_complications':
-                df_merged = df_merged.sort_values('pct_complications', ascending=False)
-            elif args.sort == 'least_complications':
-                df_merged = df_merged.sort_values('pct_complications', ascending=True)
-            elif args.sort == 'most_doses':
-                df_merged = df_merged.sort_values('total_doses', ascending=False)
-                
-            df_merged = df_merged.head(args.top)
-            
+        if args.sort == 'least_complications':
+            searched = df_merged[df_merged.get('is_searched', pd.Series([False]*len(df_merged)))]
+            unsearched = df_merged[~df_merged.get('is_searched', pd.Series([False]*len(df_merged)))].sort_values(sort_col, ascending=True)
+            df_merged = pd.concat([searched, unsearched]).reset_index(drop=True)
         title = f"Doses vs Complicações (VigiMed)"
         title += f"\nGravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
         if args.search: title += f"\n[{', '.join(args.search)}]"
