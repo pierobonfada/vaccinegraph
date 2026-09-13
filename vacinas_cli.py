@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import ssl
 import os
 import sys
 import argparse
@@ -19,7 +20,10 @@ def eprint(*args, **kwargs):
 
 def download_file(url, dest_path):
     try:
-        response = urllib.request.urlopen(url)
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        response = urllib.request.urlopen(url, context=ctx)
         total_size = int(response.headers.get('content-length', 0))
         block_size = 1024 * 1024
         downloaded = 0
@@ -276,68 +280,58 @@ def generate_timeline_chart(timeline_data, output_file=None):
 
 
 def get_vigimed_data(severity):
-    vigimed_path = os.path.join(RAW_DATA_DIR, "vigimed.csv")
+    vigimed_path = os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv")
     if not os.path.exists(vigimed_path):
-        import webbrowser
-        import glob
-        import shutil
-        from pathlib import Path
-        eprint("\n[VERIFICACAO HUMANA NECESSARIA]")
-        eprint("O portal Dados.gov.br esta bloqueando acessos automatizados (Erro 401 para robos).")
-        eprint("Abrindo o seu navegador na pagina oficial do VigiMed (ANVISA)...")
-        eprint(">> ROLE A PAGINA ATE 'Recursos' E CLIQUE PARA BAIXAR O ARQUIVO CSV.")
-        try:
-            webbrowser.open('https://www.google.com/search?q=VigiMed+ANVISA+dados+abertos+CSV+Eventos+Adversos')
-        except:
-            eprint("Nao foi possivel abrir o navegador automaticamente. Acesse: https://www.google.com/search?q=VigiMed+ANVISA+dados+abertos+CSV+Eventos+Adversos")
-            
-        input("\nPressione [ENTER] APOS o termino do download para o programa localizar o arquivo...")
-        
-        downloads_path = str(Path.home() / "Downloads")
-        patterns = [
-            os.path.join(downloads_path, "*igimed*.csv"),
-            os.path.join(downloads_path, "*Igimed*.csv"),
-            os.path.join(downloads_path, "*eacoes*.csv"),
-            os.path.join(downloads_path, "*Eacoes*.csv")
-        ]
-        
-        possible_files = []
-        for p in patterns:
-            possible_files.extend(glob.glob(p))
-            
-        if not possible_files:
-            eprint(f"\nERRO: Nao encontrei automaticamente nenhum arquivo VigiMed na sua pasta {downloads_path}.")
-            eprint(f"Mova o CSV baixado manualmente e renomeie para: {vigimed_path}")
-            sys.exit(1)
-            
-        latest_file = max(possible_files, key=os.path.getctime)
-        shutil.move(latest_file, vigimed_path)
-        eprint(f">> Arquivo importado automaticamente com sucesso:\nDe: {latest_file}\nPara: {vigimed_path}")
+        eprint("\n[AUTOMACAO] Baixando a base do VigiMed da ANVISA...")
+        url = 'https://dados.anvisa.gov.br/dados/VigiMed_Notificacoes.csv'
+        download_file(url, vigimed_path)
         
     import duckdb
     severity_filter = ""
     if severity == 'mild':
-        severity_filter = "AND LOWER(Gravidade) LIKE '%não grave%'"
+        severity_filter = "AND LOWER(GRAVE) NOT LIKE '%sim%'"
     elif severity == 'severe':
-        severity_filter = "AND LOWER(Gravidade) LIKE '%grave%' AND LOWER(Gravidade) NOT LIKE '%não grave%'"
+        severity_filter = "AND LOWER(GRAVE) LIKE '%sim%' AND LOWER(DESFECHO) NOT LIKE '%óbito%'"
     elif severity == 'death':
-        severity_filter = "AND LOWER(Desfecho) LIKE '%óbito%'"
+        severity_filter = "AND (LOWER(DESFECHO) LIKE '%óbito%' OR LOWER(DESFECHO) LIKE '%obito%' OR LOWER(DESFECHO) LIKE '%fatal%')"
         
-    eprint(f">> Processando Notificacoes VigiMed via DuckDB (Filtro: {severity})")
-    query = f"""
-        SELECT Medicamento_Suspeito AS ds_imuno, COUNT(*) as total_complications
-        FROM read_csv_auto('{vigimed_path}')
-        WHERE 1=1 {severity_filter}
-        GROUP BY Medicamento_Suspeito
-    """
+    eprint(f">> Processando Notificacoes VigiMed via Pandas (Filtro: {severity})")
     try:
-        df_vigimed = duckdb.query(query).to_df()
+        import pandas as pd
+        df_raw = pd.read_csv(vigimed_path, sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
     except Exception as e:
-        eprint(f"ERRO ao ler VigiMed CSV: {e}")
+        eprint(f"ERRO ao ler VigiMed CSV via pandas: {e}")
         sys.exit(1)
         
-    df_vigimed['vaccine'] = df_vigimed['ds_imuno'].apply(padroniza_nome_vacina)
-    df_vigimed = df_vigimed.groupby('vaccine')['total_complications'].sum().reset_index()
+    if severity == 'mild':
+        df_raw = df_raw[~df_raw['GRAVE'].str.contains('Sim', case=False, na=False)]
+    elif severity == 'severe':
+        df_raw = df_raw[df_raw['GRAVE'].str.contains('Sim', case=False, na=False) & ~df_raw['DESFECHO'].str.contains('óbito|obito|fatal', case=False, na=False)]
+    elif severity == 'death':
+        df_raw = df_raw[df_raw['DESFECHO'].str.contains('óbito|obito|fatal', case=False, na=False)]
+        
+    df_raw = df_raw.rename(columns={'NOME_MEDICAMENTO_WHODRUG': 'ds_imuno'})
+    df_raw = df_raw.dropna(subset=['ds_imuno'])
+    
+    # As rows can have multiple drugs (pipe separated), we expand them or apply padroniza loosely
+    def loose_padroniza(name):
+        if not isinstance(name, str): return 'Outros'
+        name_lower = name.lower()
+        if 'covid' in name_lower or 'coronavac' in name_lower or 'astrazeneca' in name_lower or 'pfizer' in name_lower: return 'COVID-19'
+        if 'influenza' in name_lower: return 'INFLUENZA'
+        if 'hepatite b' in name_lower: return 'HEPATITE B'
+        if 'hpv' in name_lower or 'papilomav' in name_lower: return 'HPV'
+        if 'pentavalente' in name_lower: return 'PENTAVALENTE'
+        if 'meningoc' in name_lower: return 'MENINGOCOCCICA'
+        if 'pneumoc' in name_lower: return 'PNEUMOCOCCICA'
+        if 'rotav' in name_lower: return 'ROTAVIRUS'
+        if 'febre amarela' in name_lower: return 'FEBRE AMARELA'
+        if 'bcg' in name_lower: return 'BCG'
+        if 'tríplice' in name_lower or 'triplice' in name_lower or 'sarampo' in name_lower: return 'TRIPLICE VIRAL'
+        return 'Outros'
+
+    df_raw['vaccine'] = df_raw['ds_imuno'].apply(loose_padroniza)
+    df_vigimed = df_raw[df_raw['vaccine'] != 'Outros'].groupby('vaccine').size().reset_index(name='total_complications')
     return df_vigimed
 
 def generate_complications_chart(df, title, output_file=None):
