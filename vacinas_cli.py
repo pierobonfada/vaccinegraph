@@ -274,6 +274,85 @@ def generate_timeline_chart(timeline_data, output_file=None):
 
 
 
+
+def get_vigimed_data(severity):
+    vigimed_path = os.path.join(RAW_DATA_DIR, "vigimed.csv")
+    if not os.path.exists(vigimed_path):
+        eprint("\n[BLOQUEIO DE SEGURANCA] O portal Dados.gov.br esta bloqueando acessos automatizados (Erro 401 Unauthorized).")
+        eprint("Como temos a regra estrita de JAMAIS usar dados simulados, o processamento foi pausado.")
+        eprint("Para prosseguir, baixe a base do VigiMed manualmente e coloque em:")
+        eprint(f"-> {vigimed_path}")
+        sys.exit(1)
+        
+    import duckdb
+    severity_filter = ""
+    if severity == 'mild':
+        severity_filter = "AND LOWER(Gravidade) LIKE '%não grave%'"
+    elif severity == 'severe':
+        severity_filter = "AND LOWER(Gravidade) LIKE '%grave%' AND LOWER(Gravidade) NOT LIKE '%não grave%'"
+    elif severity == 'death':
+        severity_filter = "AND LOWER(Desfecho) LIKE '%óbito%'"
+        
+    eprint(f">> Processando Notificacoes VigiMed via DuckDB (Filtro: {severity})")
+    query = f"""
+        SELECT Medicamento_Suspeito AS ds_imuno, COUNT(*) as total_complications
+        FROM read_csv_auto('{vigimed_path}')
+        WHERE 1=1 {severity_filter}
+        GROUP BY Medicamento_Suspeito
+    """
+    try:
+        df_vigimed = duckdb.query(query).to_df()
+    except Exception as e:
+        eprint(f"ERRO ao ler VigiMed CSV: {e}")
+        sys.exit(1)
+        
+    df_vigimed['vaccine'] = df_vigimed['ds_imuno'].apply(padroniza_nome_vacina)
+    df_vigimed = df_vigimed.groupby('vaccine')['total_complications'].sum().reset_index()
+    return df_vigimed
+
+def generate_complications_chart(df, title, output_file=None):
+    if df.empty:
+        eprint("ERRO: Nenhum dado de complicacao para plotar.")
+        sys.exit(1)
+        
+    fig, ax = plt.subplots(figsize=(14, 8))
+    
+    # Nested bars (Outer: Doses, Inner: Complications)
+    x = range(len(df['vaccine']))
+    
+    # Outer bar (Blue)
+    bars_doses = ax.bar(x, df['total_doses'], width=0.8, color='#3498db', label='Doses Aplicadas')
+    # Inner bar (Red)
+    bars_comps = ax.bar(x, df['total_complications'], width=0.4, color='#e74c3c', label='Complicações (EAPV)')
+    
+    # Using Log Scale so both millions of doses and hundreds of complications are visible
+    ax.set_yscale('log')
+    
+    ax.set_title(title, fontsize=16, fontweight='bold', pad=20)
+    ax.set_xticks(x)
+    ax.set_xticklabels(df['vaccine'], rotation=45, ha='right', fontsize=10)
+    ax.set_ylabel('Quantidade (Escala Logarítmica)', fontsize=12)
+    
+    # Add values on top of the bars
+    for i, (dose, comp, pct) in enumerate(zip(df['total_doses'], df['total_complications'], df['pct_complications'])):
+        dose_str = f'{int(dose):,}'.replace(',', '.')
+        comp_str = f'{int(comp):,}'.replace(',', '.')
+        
+        # Annotate doses
+        ax.annotate(f'D: {dose_str}', (i, dose), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#2980b9', xytext=(0, 2), textcoords='offset points')
+        # Annotate complications
+        ax.annotate(f'C: {comp_str}\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=9, fontweight='bold', color='#c0392b', xytext=(0, 2), textcoords='offset points')
+        
+    # Legend
+    ax.legend(loc='upper right', fontsize=12)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.3)
+    
+    ylim = ax.get_ylim()
+    ax.set_ylim(ylim[0], ylim[1] * 5) # Expand log scale ceiling for annotations
+    
+    plt.tight_layout()
+    handle_output(fig, output_file)
+
 def generate_profile_chart(df, title, output_file=None):
     if df.empty:
         eprint("ERRO: Nenhum dado para plotar perfil.")
@@ -382,7 +461,7 @@ def main():
     parser.add_argument('--end-year', type=int, help="Ano final.")
     parser.add_argument('--clear-cache', action='store_true', help="Deleta todos os dados baixados e o banco consolidado.")
     parser.add_argument('--update', action='store_true', help="Forca o download ignorando cache.")
-    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile'], default='doses', help="Tipo de grafico.")
+    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications'], default='doses', help="Tipo de grafico.")
     parser.add_argument('--search', type=str, nargs='+')
     parser.add_argument('--top', type=int)
     parser.add_argument('--bottom', type=int)
@@ -482,6 +561,49 @@ def main():
         if args.city: title += f" (Mun: {','.join(args.city)})"
         
         generate_profile_chart(df, title, output_file=args.output)
+    elif args.chart == 'complications':
+        all_dfs = []
+        for y in range(start, end + 1):
+            df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='doses')
+            if not df_y.empty:
+                all_dfs.append(df_y)
+                
+        if not all_dfs:
+            eprint("Sem dados de doses para o periodo.")
+            sys.exit(1)
+            
+        df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
+        
+        # Merge with VigiMed
+        df_vigimed = get_vigimed_data(args.severity)
+        df_merged = pd.merge(df_doses, df_vigimed, on='vaccine', how='inner')
+        
+        if df_merged.empty:
+            eprint("Nenhuma vacina em comum entre a base de doses e as notificacoes do VigiMed (apos filtros).")
+            sys.exit(1)
+            
+        # Calculate percentage
+        df_merged['pct_complications'] = (df_merged['total_complications'] / df_merged['total_doses']) * 100
+        
+        if args.search:
+            search_terms = [s.lower() for s in args.search]
+            df_merged = df_merged[df_merged['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
+        else:
+            if args.sort == 'most_complications':
+                df_merged = df_merged.sort_values('pct_complications', ascending=False)
+            elif args.sort == 'least_complications':
+                df_merged = df_merged.sort_values('pct_complications', ascending=True)
+            elif args.sort == 'most_doses':
+                df_merged = df_merged.sort_values('total_doses', ascending=False)
+                
+            df_merged = df_merged.head(args.top)
+            
+        title = f"Doses vs Complicações (VigiMed)"
+        title += f"\nGravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
+        if args.search: title += f"\n[{', '.join(args.search)}]"
+        if args.state: title += f" ({' '.join(args.state)})"
+        
+        generate_complications_chart(df_merged, title, output_file=args.output)
     else:
         all_dfs = []
         for y in range(start, end + 1):
