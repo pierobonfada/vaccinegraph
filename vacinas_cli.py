@@ -345,14 +345,14 @@ def generate_complications_chart(df, title, output_file=None):
     
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.grid(True, axis='y', linestyle='--', alpha=0.5, which='both')
+    
     
     for i, (dose, comp, pct) in enumerate(zip(df['total_doses'], df['total_complications'], df['pct_complications'])):
         dose_str = f'{int(dose):,}'.replace(',', '.')
         comp_str = f'{int(comp):,}'.replace(',', '.')
         
-        ax.annotate(f'{dose_str}\\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
-        ax.annotate(f'{comp_str}\\nCasos\\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
+        ax.annotate(f'{dose_str}\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
+        ax.annotate(f'{comp_str}\nCasos\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
         
     ylim = ax.get_ylim()
     ax.set_ylim(ylim[0], ylim[1] * 3.5)
