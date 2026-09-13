@@ -316,22 +316,10 @@ def get_vigimed_data(severity):
     # As rows can have multiple drugs (pipe separated), we expand them or apply padroniza loosely
     def loose_padroniza(name):
         if not isinstance(name, str): return 'Outros'
-        name_lower = name.lower()
-        if 'covid' in name_lower or 'coronavac' in name_lower or 'astrazeneca' in name_lower or 'pfizer' in name_lower: return 'COVID-19'
-        if 'influenza' in name_lower: return 'INFLUENZA'
-        if 'hepatite b' in name_lower: return 'HEPATITE B'
-        if 'hpv' in name_lower or 'papilomav' in name_lower: return 'HPV'
-        if 'pentavalente' in name_lower: return 'PENTAVALENTE'
-        if 'meningoc' in name_lower: return 'MENINGOCOCCICA'
-        if 'pneumoc' in name_lower: return 'PNEUMOCOCCICA'
-        if 'rotav' in name_lower: return 'ROTAVIRUS'
-        if 'febre amarela' in name_lower: return 'FEBRE AMARELA'
-        if 'bcg' in name_lower: return 'BCG'
-        if 'tríplice' in name_lower or 'triplice' in name_lower or 'sarampo' in name_lower: return 'TRIPLICE VIRAL'
-        return 'Outros'
+        return padroniza_nome_vacina(name)
 
     df_raw['vaccine'] = df_raw['ds_imuno'].apply(loose_padroniza)
-    df_vigimed = df_raw[df_raw['vaccine'] != 'Outros'].groupby('vaccine').size().reset_index(name='total_complications')
+    df_vigimed = df_raw.groupby('vaccine').size().reset_index(name='total_complications')
     return df_vigimed
 
 def generate_complications_chart(df, title, output_file=None):
@@ -339,53 +327,43 @@ def generate_complications_chart(df, title, output_file=None):
         eprint("ERRO: Nenhum dado de complicacao para plotar.")
         sys.exit(1)
         
-    fig, ax1 = plt.subplots(figsize=(15, 8))
+    fig, ax = plt.subplots(figsize=(15, 8))
     fig.patch.set_facecolor('#f8f9fa')
-    ax1.set_facecolor('#ffffff')
+    ax.set_facecolor('#ffffff')
     
     x = range(len(df['vaccine']))
     
-    color_doses = '#bdc3c7'
-    bars_doses = ax1.bar(x, df['total_doses'], width=0.7, color=color_doses, label='Doses Aplicadas', alpha=0.7)
+    bars_doses = ax.bar(x, df['total_doses'], width=0.8, color='#bdc3c7', edgecolor='#95a5a6', label='Doses Aplicadas')
+    bars_comps = ax.bar(x, df['total_complications'], width=0.4, color='#e74c3c', label='Complicações (VigiMed)')
     
-    ax2 = ax1.twinx()
-    color_comps = '#e74c3c'
-    bars_comps = ax2.bar(x, df['total_complications'], width=0.35, color=color_comps, label='Complicações (VigiMed)')
+    ax.set_yscale('log')
+    ax.set_ylabel('Quantidade (Escala Logarítmica)', fontsize=12, fontweight='bold', color='#2c3e50')
+    ax.yaxis.set_major_formatter(FuncFormatter(format_millions))
     
-    ax1.set_ylabel('Total de Doses Aplicadas', color='#7f8c8d', fontsize=12, fontweight='bold')
-    ax2.set_ylabel('Número de Complicações Notificadas', color=color_comps, fontsize=12, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(df['vaccine'], rotation=40, ha='right', fontsize=11, fontweight='bold')
     
-    ax1.tick_params(axis='y', labelcolor='#7f8c8d')
-    ax1.yaxis.set_major_formatter(FuncFormatter(format_millions))
-    ax2.tick_params(axis='y', labelcolor=color_comps)
-    
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(df['vaccine'], rotation=40, ha='right', fontsize=11, fontweight='bold')
-    
-    ax1.spines['top'].set_visible(False)
-    ax2.spines['top'].set_visible(False)
-    ax1.grid(True, axis='y', linestyle='--', alpha=0.4, color='#bdc3c7')
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.5, which='both')
     
     for i, (dose, comp, pct) in enumerate(zip(df['total_doses'], df['total_complications'], df['pct_complications'])):
         dose_str = f'{int(dose):,}'.replace(',', '.')
         comp_str = f'{int(comp):,}'.replace(',', '.')
         
-        ax1.annotate(f'{dose_str}\\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
-        ax2.annotate(f'{comp_str}\\nCasos\\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
+        ax.annotate(f'{dose_str}\\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color='#7f8c8d', xytext=(0, 3), textcoords='offset points')
+        ax.annotate(f'{comp_str}\\nCasos\\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
         
-    ylim1 = ax1.get_ylim()
-    ax1.set_ylim(ylim1[0], ylim1[1] * 1.25)
-    ylim2 = ax2.get_ylim()
-    ax2.set_ylim(ylim2[0], ylim2[1] * 1.25)
+    ylim = ax.get_ylim()
+    ax.set_ylim(ylim[0], ylim[1] * 3.5)
     
     fig.legend(loc='upper center', bbox_to_anchor=(0.5, 0.93), ncol=2, frameon=False, fontsize=12)
     
     plt.suptitle(title, fontsize=16, fontweight='black', color='#2c3e50', y=0.98)
-    ax1.set_title("ATENÇÃO: Este gráfico possui DUAS escalas lineares independentes (Eixo Esq = Doses | Eixo Dir = Casos)", fontsize=10, color='#e67e22', style='italic', pad=30)
+    ax.set_title("O eixo Y está em escala logarítmica para evidenciar a grande diferença entre doses e casos", fontsize=10, color='#7f8c8d', style='italic', pad=30)
     
     plt.tight_layout(rect=[0, 0, 1, 0.92])
     handle_output(fig, output_file)
-
 def generate_profile_chart(df, title, output_file=None):
     if df.empty:
         eprint("ERRO: Nenhum dado para plotar perfil.")
