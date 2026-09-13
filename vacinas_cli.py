@@ -287,9 +287,9 @@ def get_vigimed_data(severity):
         eprint("Abrindo o seu navegador na pagina oficial do VigiMed (ANVISA)...")
         eprint(">> ROLE A PAGINA ATE 'Recursos' E CLIQUE PARA BAIXAR O ARQUIVO CSV.")
         try:
-            webbrowser.open('https://dados.gov.br/dados/conjuntos-dados/vigimed---reacoes-adversas-a-medicamentos-e-vacinas')
+            webbrowser.open('https://www.google.com/search?q=VigiMed+ANVISA+dados+abertos+CSV+Eventos+Adversos')
         except:
-            eprint("Nao foi possivel abrir o navegador automaticamente. Acesse: https://dados.gov.br/dados/conjuntos-dados/vigimed---reacoes-adversas-a-medicamentos-e-vacinas")
+            eprint("Nao foi possivel abrir o navegador automaticamente. Acesse: https://www.google.com/search?q=VigiMed+ANVISA+dados+abertos+CSV+Eventos+Adversos")
             
         input("\nPressione [ENTER] APOS o termino do download para o programa localizar o arquivo...")
         
