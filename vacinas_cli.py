@@ -73,7 +73,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
     suffix = "_" + "_".join(states) if states else ""
     if cities: suffix += "_mun_" + "_".join(cities)
     
-    filename = "Doses_Residencia.parquet" if mode == 'doses' else "Cobertura_Residencia.parquet"
+    filename = "Doses_Residencia.parquet" if mode in ['doses', 'monthly'] else "Cobertura_Residencia.parquet"
     DATABASE_FILE = os.path.join(DATA_DIR, f"vaccination_aggregate_{year}_{mode}{suffix}.parquet")
     
     eprint(f"\n[Fase 1] Verificacao de Dados Reais do SI-PNI (SIPNIBD - {year}) - Modo: {mode}")
@@ -90,8 +90,8 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
         
         UF_CODES = {'AC': '12', 'AL': '27', 'AM': '13', 'AP': '16', 'BA': '29', 'CE': '23', 'DF': '53', 'ES': '32', 'GO': '52', 'MA': '21', 'MG': '31', 'MS': '50', 'MT': '51', 'PA': '15', 'PB': '25', 'PE': '26', 'PI': '22', 'PR': '41', 'RJ': '33', 'RN': '24', 'RO': '11', 'RR': '14', 'RS': '43', 'SC': '42', 'SE': '28', 'SP': '35', 'TO': '17'}
         
-        if mode == 'doses':
-            cols = ['nu_ano', 'co_municipio', 'ds_imuno', 'qt_dose']
+        if mode in ['doses', 'monthly']:
+            cols = ['nu_ano', 'nu_mes', 'co_municipio', 'ds_imuno', 'qt_dose'] if mode == 'monthly' else ['nu_ano', 'co_municipio', 'ds_imuno', 'qt_dose']
             df_raw = pd.read_parquet(dest_path, columns=cols)
             df_ano = df_raw[df_raw['nu_ano'] == int(year)].copy()
             if states:
@@ -101,7 +101,10 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
                 df_ano = df_ano[df_ano['co_municipio'].isin(cities)]
             df_ano['vaccine'] = df_ano['ds_imuno'].apply(padroniza_nome_vacina)
             df_ano['qt_dose'] = pd.to_numeric(df_ano['qt_dose'], errors='coerce').fillna(0)
-            df = df_ano.groupby('vaccine')['qt_dose'].sum().reset_index()
+            if mode == 'monthly':
+                df = df_ano.groupby(['vaccine', 'nu_mes', 'nu_ano'])['qt_dose'].sum().reset_index()
+            else:
+                df = df_ano.groupby('vaccine')['qt_dose'].sum().reset_index()
             df = df.rename(columns={'qt_dose': 'total_doses'})
         else:
             df_raw = pd.read_parquet(dest_path)
@@ -227,6 +230,36 @@ def generate_timeline_chart(timeline_data, output_file=None):
     annotate_bars(ax)
     handle_output(fig, output_file)
 
+
+def generate_monthly_chart(df, title, output_file=None):
+    if df.empty:
+        eprint("ERRO: Nenhum dado para plotar.")
+        sys.exit(1)
+        
+    df['periodo'] = df['nu_ano'].astype(str) + '-' + df['nu_mes'].astype(str).str.zfill(2)
+    df = df.sort_values('periodo')
+    
+    # Pivot so each vaccine is a column
+    pivot = df.pivot(index='periodo', columns='vaccine', values='total_doses').fillna(0)
+    
+    fig, ax = plt.subplots(figsize=(14, 7))
+    
+    # Plot each line
+    for col in pivot.columns:
+        ax.plot(pivot.index, pivot[col], marker='o', linewidth=2, label=col)
+        
+    ax.set_title(title, fontsize=16, pad=20)
+    ax.set_ylabel('Total Absoluto de Vacinas Aplicadas', fontsize=12)
+    ax.set_xlabel('Período (Ano-Mês)', fontsize=12)
+    ax.tick_params(axis='x', rotation=45)
+    ax.yaxis.set_major_formatter(FuncFormatter(format_millions))
+    ax.grid(True, linestyle='--', alpha=0.6)
+    
+    # Put legend outside if too many
+    ax.legend(title='Vacina', bbox_to_anchor=(1.05, 1), loc='upper left')
+    
+    handle_output(fig, output_file)
+
 def generate_total_yearly_chart(yearly_data, output_file=None, title="Total de Doses Aplicadas por Ano"):
     import numpy as np
     years = sorted(list(yearly_data.keys()))
@@ -250,7 +283,7 @@ def main():
     parser.add_argument('--end-year', type=int, help="Ano final.")
     parser.add_argument('--clear-cache', action='store_true', help="Deleta todos os dados baixados e o banco consolidado.")
     parser.add_argument('--update', action='store_true', help="Forca o download ignorando cache.")
-    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly'], default='doses', help="Tipo de grafico.")
+    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly'], default='doses', help="Tipo de grafico.")
     parser.add_argument('--search', type=str, nargs='+')
     parser.add_argument('--top', type=int)
     parser.add_argument('--bottom', type=int)
@@ -310,6 +343,26 @@ def main():
         if args.city: title += f" (Municípios: {','.join(args.city)})"
         generate_total_yearly_chart(yearly_data, output_file=args.output, title=title)
         
+    elif args.chart == 'monthly':
+        all_dfs = []
+        for y in range(start, end + 1):
+            df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='monthly')
+            if not df_y.empty:
+                all_dfs.append(df_y)
+        if all_dfs:
+            df = pd.concat(all_dfs)
+            if args.search:
+                search_terms = [s.lower() for s in args.search]
+                df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
+        else:
+            df = pd.DataFrame(columns=['vaccine', 'nu_mes', 'nu_ano', 'total_doses'])
+            
+        title = f"Série Temporal de Vacinação (Mês a Mês)"
+        if args.search: title += f"\n[{', '.join(args.search)}]"
+        if args.state: title += f" ({' '.join(args.state)})"
+        if args.city: title += f" (Mun: {','.join(args.city)})"
+        
+        generate_monthly_chart(df, title, output_file=args.output)
     else:
         all_dfs = []
         for y in range(start, end + 1):
