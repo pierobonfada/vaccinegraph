@@ -73,7 +73,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
     suffix = "_" + "_".join(states) if states else ""
     if cities: suffix += "_mun_" + "_".join(cities)
     
-    filename = "Doses_Residencia.parquet" if mode in ['doses', 'monthly'] else "Cobertura_Residencia.parquet"
+    filename = "Doses_Residencia.parquet" if mode in ['doses', 'monthly', 'profile'] else "Cobertura_Residencia.parquet"
     DATABASE_FILE = os.path.join(DATA_DIR, f"vaccination_aggregate_{year}_{mode}{suffix}.parquet")
     
     eprint(f"\n[Fase 1] Verificacao de Dados Reais do SI-PNI (SIPNIBD - {year}) - Modo: {mode}")
@@ -86,38 +86,75 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
         updated_any = True
         
     if updated_any or not os.path.exists(DATABASE_FILE) or force_update:
-        eprint(f">> Lendo banco Parquet massivo de {mode} e agregando doses...")
+        eprint(f">> Processando Parquet massivo via DuckDB (Ultra Otimizado/Out-of-Core)...")
+        import duckdb
         
         UF_CODES = {'AC': '12', 'AL': '27', 'AM': '13', 'AP': '16', 'BA': '29', 'CE': '23', 'DF': '53', 'ES': '32', 'GO': '52', 'MA': '21', 'MG': '31', 'MS': '50', 'MT': '51', 'PA': '15', 'PB': '25', 'PE': '26', 'PI': '22', 'PR': '41', 'RJ': '33', 'RN': '24', 'RO': '11', 'RR': '14', 'RS': '43', 'SC': '42', 'SE': '28', 'SP': '35', 'TO': '17'}
         
-        if mode in ['doses', 'monthly']:
-            cols = ['nu_ano', 'nu_mes', 'co_municipio', 'ds_imuno', 'qt_dose'] if mode == 'monthly' else ['nu_ano', 'co_municipio', 'ds_imuno', 'qt_dose']
-            df_raw = pd.read_parquet(dest_path, columns=cols)
-            df_ano = df_raw[df_raw['nu_ano'] == int(year)].copy()
+        where_clauses = []
+        
+        if filename == "Doses_Residencia.parquet":
+            where_clauses.append(f"nu_ano = {year}")
             if states:
-                codes = [UF_CODES[uf] for uf in states]
-                df_ano = df_ano[df_ano['co_municipio'].str[:2].isin(codes)]
+                state_prefixes = [UF_CODES[uf] for uf in states]
+                # SUBSTRING(co_municipio, 1, 2) IN ('43', '42')
+                prefixes_str = ", ".join([f"'{p}'" for p in state_prefixes])
+                where_clauses.append(f"SUBSTRING(CAST(co_municipio AS VARCHAR), 1, 2) IN ({prefixes_str})")
             if cities:
-                df_ano = df_ano[df_ano['co_municipio'].isin(cities)]
-            df_ano['vaccine'] = df_ano['ds_imuno'].apply(padroniza_nome_vacina)
-            df_ano['qt_dose'] = pd.to_numeric(df_ano['qt_dose'], errors='coerce').fillna(0)
+                cities_str = ", ".join([f"'{c}'" for c in cities])
+                where_clauses.append(f"CAST(co_municipio AS VARCHAR) IN ({cities_str})")
+                
+            where_sql = " AND ".join(where_clauses)
+            
             if mode == 'monthly':
-                df = df_ano.groupby(['vaccine', 'nu_mes', 'nu_ano'])['qt_dose'].sum().reset_index()
+                query = f"SELECT ds_imuno, nu_mes, nu_ano, SUM(TRY_CAST(qt_dose AS NUMERIC)) as total_doses FROM read_parquet('{dest_path}') WHERE {where_sql} GROUP BY ds_imuno, nu_mes, nu_ano"
+                df = duckdb.query(query).to_df()
+                df['vaccine'] = df['ds_imuno'].apply(padroniza_nome_vacina)
+                df = df.groupby(['vaccine', 'nu_mes', 'nu_ano'])['total_doses'].sum().reset_index()
+                
+            elif mode == 'profile':
+                query = f"SELECT ds_imuno, co_sexo, co_racacor, nu_idade, SUM(TRY_CAST(qt_dose AS NUMERIC)) as total_doses FROM read_parquet('{dest_path}') WHERE {where_sql} GROUP BY ds_imuno, co_sexo, co_racacor, nu_idade"
+                df_ano = duckdb.query(query).to_df()
+                
+                df_ano['vaccine'] = df_ano['ds_imuno'].apply(padroniza_nome_vacina)
+                df_ano['nu_idade'] = pd.to_numeric(df_ano['nu_idade'], errors='coerce')
+                
+                def get_age_group(age):
+                    if pd.isna(age): return 'Sem Informação'
+                    if age <= 4: return '0-4 anos'
+                    if age <= 11: return '5-11 anos'
+                    if age <= 19: return '12-19 anos'
+                    if age <= 39: return '20-39 anos'
+                    if age <= 59: return '40-59 anos'
+                    return '60+ anos'
+                    
+                df_ano['age_group'] = df_ano['nu_idade'].apply(get_age_group)
+                df_ano['co_sexo'] = df_ano['co_sexo'].fillna('SEM INFORMACAO').astype(str)
+                df_ano['co_racacor'] = df_ano['co_racacor'].fillna('SEM INFORMACAO').astype(str)
+                
+                df = df_ano.groupby(['vaccine', 'co_sexo', 'co_racacor', 'age_group'])['total_doses'].sum().reset_index()
+                
             else:
-                df = df_ano.groupby('vaccine')['qt_dose'].sum().reset_index()
-            df = df.rename(columns={'qt_dose': 'total_doses'})
+                query = f"SELECT ds_imuno, SUM(TRY_CAST(qt_dose AS NUMERIC)) as total_doses FROM read_parquet('{dest_path}') WHERE {where_sql} GROUP BY ds_imuno"
+                df = duckdb.query(query).to_df()
+                df['vaccine'] = df['ds_imuno'].apply(padroniza_nome_vacina)
+                df = df.groupby('vaccine')['total_doses'].sum().reset_index()
+                
         else:
-            df_raw = pd.read_parquet(dest_path)
-            df_raw['CO_ANO'] = df_raw['CO_ANO'].astype(str)
-            df_ano = df_raw[df_raw['CO_ANO'] == str(year)].copy()
+            where_clauses.append(f"CO_ANO = '{year}'")
             if states:
-                df_ano = df_ano[df_ano['CO_UF'].isin(states)]
+                states_str = ", ".join([f"'{s}'" for s in states])
+                where_clauses.append(f"CO_UF IN ({states_str})")
             if cities:
-                df_ano = df_ano[df_ano['CO_MUNICIPIO'].astype(str).isin(cities)]
-            df_ano['vaccine'] = df_ano['NU_IMUNO'].apply(padroniza_nome_vacina)
-            df_ano['QT_DOSE'] = pd.to_numeric(df_ano['QT_DOSE'], errors='coerce').fillna(0)
-            df = df_ano.groupby('vaccine')['QT_DOSE'].sum().reset_index()
-            df = df.rename(columns={'QT_DOSE': 'total_doses'})
+                cities_str = ", ".join([f"'{c}'" for c in cities])
+                where_clauses.append(f"CAST(CO_MUNICIPIO AS VARCHAR) IN ({cities_str})")
+                
+            where_sql = " AND ".join(where_clauses)
+            
+            query = f"SELECT NU_IMUNO, SUM(TRY_CAST(QT_DOSE AS NUMERIC)) as total_doses FROM read_parquet('{dest_path}') WHERE {where_sql} GROUP BY NU_IMUNO"
+            df = duckdb.query(query).to_df()
+            df['vaccine'] = df['NU_IMUNO'].apply(padroniza_nome_vacina)
+            df = df.groupby('vaccine')['total_doses'].sum().reset_index()
 
         df.to_parquet(DATABASE_FILE, index=False)
         return df
@@ -153,14 +190,19 @@ def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=No
         
     return stats_df
 
-def annotate_bars(ax):
+def annotate_bars(ax, show_pct=False, total=None):
     for p in ax.patches:
-        val = p.get_height()
-        if val > 0:
-            ax.annotate(f'{int(val):,}', 
-                        (p.get_x() + p.get_width() / 2., val/2), 
-                        ha='center', va='center', rotation=90, 
-                        color='white', fontsize=10, fontweight='bold')
+        height = p.get_height()
+        if height > 0:
+            val_str = f'{int(height):,}'.replace(',', '.')
+            if show_pct and total and total > 0:
+                pct = (height / total) * 100
+                val_str = f'{val_str} ({pct:.1f}%)'
+            ax.annotate(val_str, 
+                        (p.get_x() + p.get_width() / 2., height),
+                        ha='center', va='bottom', rotation=90, color='black', fontweight='bold', fontsize=10, xytext=(0, 5), textcoords='offset points')
+    ylim = ax.get_ylim()
+    ax.set_ylim(ylim[0], ylim[1] * 1.3)
 
 def format_millions(x, pos):
     if x >= 1e6:
@@ -231,6 +273,63 @@ def generate_timeline_chart(timeline_data, output_file=None):
     handle_output(fig, output_file)
 
 
+
+def generate_profile_chart(df, title, output_file=None):
+    if df.empty:
+        eprint("ERRO: Nenhum dado para plotar perfil.")
+        sys.exit(1)
+        
+    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+    fig.suptitle(title, fontsize=18, fontweight='bold', y=0.98)
+    
+    # 1. Sexo
+    ax1 = axes[0, 0]
+    df_sexo = df.groupby('co_sexo')['total_doses'].sum().sort_values(ascending=False)
+    
+    def make_autopct(values):
+        def my_autopct(pct):
+            total = sum(values)
+            val = int(round(pct*total/100.0))
+            val_str = f'{val:,}'.replace(',', '.')
+            return f'{pct:.1f}%\n({val_str})'
+        return my_autopct
+        
+    ax1.pie(df_sexo.values, labels=df_sexo.index, autopct=make_autopct(df_sexo.values), startangle=90, colors=['#3498db', '#e74c3c', '#95a5a6'], textprops={'color':'black', 'weight':'bold'})
+    ax1.set_title("Distribuição por Sexo", fontsize=14)
+    
+    # 2. Raça/Cor
+    ax2 = axes[0, 1]
+    df_raca = df.groupby('co_racacor')['total_doses'].sum().sort_values(ascending=True)
+    ax2.barh(df_raca.index, df_raca.values, color='#9b59b6')
+    ax2.set_title("Distribuição por Raça/Cor", fontsize=14)
+    ax2.xaxis.set_major_formatter(FuncFormatter(format_millions))
+    
+    for p in ax2.patches:
+        width = p.get_width()
+        if width > 0:
+            val_str = f'{int(width):,}'.replace(',', '.')
+            ax2.annotate(val_str,
+                         (width, p.get_y() + p.get_height() / 2.),
+                         ha='left', va='center', color='black', fontweight='bold', fontsize=10, xytext=(5, 0), textcoords='offset points')
+    xlim = ax2.get_xlim()
+    ax2.set_xlim(xlim[0], xlim[1] * 1.3)
+    
+    # 3. Faixa Etária
+    ax3 = plt.subplot(2, 1, 2)
+    age_order = ['0-4 anos', '5-11 anos', '12-19 anos', '20-39 anos', '40-59 anos', '60+ anos', 'Sem Informação']
+    df_idade = df.groupby('age_group')['total_doses'].sum().reindex(age_order).fillna(0)
+    
+    bars = ax3.bar(df_idade.index, df_idade.values, color='#f1c40f')
+    ax3.set_title("Distribuição por Faixa Etária", fontsize=14)
+    ax3.yaxis.set_major_formatter(FuncFormatter(format_millions))
+    annotate_bars(ax3, show_pct=True, total=df_idade.sum())
+    
+    # Hide axes[1,0] and axes[1,1] because we used a big subplot for age
+    axes[1,0].remove()
+    axes[1,1].remove()
+    
+    handle_output(fig, output_file)
+
 def generate_monthly_chart(df, title, output_file=None):
     if df.empty:
         eprint("ERRO: Nenhum dado para plotar.")
@@ -283,7 +382,7 @@ def main():
     parser.add_argument('--end-year', type=int, help="Ano final.")
     parser.add_argument('--clear-cache', action='store_true', help="Deleta todos os dados baixados e o banco consolidado.")
     parser.add_argument('--update', action='store_true', help="Forca o download ignorando cache.")
-    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly'], default='doses', help="Tipo de grafico.")
+    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile'], default='doses', help="Tipo de grafico.")
     parser.add_argument('--search', type=str, nargs='+')
     parser.add_argument('--top', type=int)
     parser.add_argument('--bottom', type=int)
@@ -363,6 +462,26 @@ def main():
         if args.city: title += f" (Mun: {','.join(args.city)})"
         
         generate_monthly_chart(df, title, output_file=args.output)
+    elif args.chart == 'profile':
+        all_dfs = []
+        for y in range(start, end + 1):
+            df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='profile')
+            if not df_y.empty:
+                all_dfs.append(df_y)
+        if all_dfs:
+            df = pd.concat(all_dfs)
+            if args.search:
+                search_terms = [s.lower() for s in args.search]
+                df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
+        else:
+            df = pd.DataFrame(columns=['vaccine', 'co_sexo', 'co_racacor', 'age_group', 'total_doses'])
+            
+        title = f"Perfil Demográfico da População Vacinada"
+        if args.search: title += f"\n[{', '.join(args.search)}]"
+        if args.state: title += f" ({' '.join(args.state)})"
+        if args.city: title += f" (Mun: {','.join(args.city)})"
+        
+        generate_profile_chart(df, title, output_file=args.output)
     else:
         all_dfs = []
         for y in range(start, end + 1):
