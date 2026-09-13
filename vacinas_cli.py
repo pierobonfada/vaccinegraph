@@ -607,6 +607,7 @@ def main():
             'most_doses': 'total_doses'
         }
         sort_col = sort_col_map.get(args.sort, 'pct_complications')
+        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom)
         
         if args.sort == 'least_complications':
             searched = df_merged[df_merged.get('is_searched', pd.Series([False]*len(df_merged)))]
