@@ -278,11 +278,41 @@ def generate_timeline_chart(timeline_data, output_file=None):
 def get_vigimed_data(severity):
     vigimed_path = os.path.join(RAW_DATA_DIR, "vigimed.csv")
     if not os.path.exists(vigimed_path):
-        eprint("\n[BLOQUEIO DE SEGURANCA] O portal Dados.gov.br esta bloqueando acessos automatizados (Erro 401 Unauthorized).")
-        eprint("Como temos a regra estrita de JAMAIS usar dados simulados, o processamento foi pausado.")
-        eprint("Para prosseguir, baixe a base do VigiMed manualmente e coloque em:")
-        eprint(f"-> {vigimed_path}")
-        sys.exit(1)
+        import webbrowser
+        import glob
+        import shutil
+        from pathlib import Path
+        eprint("\n[VERIFICACAO HUMANA NECESSARIA]")
+        eprint("O portal Dados.gov.br esta bloqueando acessos automatizados (Erro 401 para robos).")
+        eprint("Abrindo o seu navegador na pagina oficial do VigiMed (ANVISA)...")
+        eprint(">> ROLE A PAGINA ATE 'Recursos' E CLIQUE PARA BAIXAR O ARQUIVO CSV.")
+        try:
+            webbrowser.open('https://dados.gov.br/dados/conjuntos-dados/vigimed---reacoes-adversas-a-medicamentos-e-vacinas')
+        except:
+            eprint("Nao foi possivel abrir o navegador automaticamente. Acesse: https://dados.gov.br/dados/conjuntos-dados/vigimed---reacoes-adversas-a-medicamentos-e-vacinas")
+            
+        input("\nPressione [ENTER] APOS o termino do download para o programa localizar o arquivo...")
+        
+        downloads_path = str(Path.home() / "Downloads")
+        patterns = [
+            os.path.join(downloads_path, "*igimed*.csv"),
+            os.path.join(downloads_path, "*Igimed*.csv"),
+            os.path.join(downloads_path, "*eacoes*.csv"),
+            os.path.join(downloads_path, "*Eacoes*.csv")
+        ]
+        
+        possible_files = []
+        for p in patterns:
+            possible_files.extend(glob.glob(p))
+            
+        if not possible_files:
+            eprint(f"\nERRO: Nao encontrei automaticamente nenhum arquivo VigiMed na sua pasta {downloads_path}.")
+            eprint(f"Mova o CSV baixado manualmente e renomeie para: {vigimed_path}")
+            sys.exit(1)
+            
+        latest_file = max(possible_files, key=os.path.getctime)
+        shutil.move(latest_file, vigimed_path)
+        eprint(f">> Arquivo importado automaticamente com sucesso:\nDe: {latest_file}\nPara: {vigimed_path}")
         
     import duckdb
     severity_filter = ""
