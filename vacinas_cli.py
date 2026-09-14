@@ -16,6 +16,41 @@ DATA_DIR = "data"
 RAW_DATA_DIR = os.path.join(DATA_DIR, "raw")
 OUTPUT_DIR = "output"
 
+
+def resolve_city_name(city_arg):
+    if city_arg.isdigit() and len(city_arg) == 6:
+        return city_arg
+        
+    eprint(f"Consultando IBGE para a cidade: {city_arg}...")
+    import urllib.request
+    import json
+    import gzip
+    try:
+        req = urllib.request.Request('https://servicodados.ibge.gov.br/api/v1/localidades/municipios', headers={'Accept-Encoding': 'gzip'})
+        with urllib.request.urlopen(req) as response:
+            if response.info().get('Content-Encoding') == 'gzip':
+                data = json.loads(gzip.decompress(response.read()).decode('utf-8'))
+            else:
+                data = json.loads(response.read().decode('utf-8'))
+                
+        # Normalizar string (remover acentos) para busca
+        import unicodedata
+        def normalize(s):
+            return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
+            
+        search_norm = normalize(city_arg)
+        for m in data:
+            if normalize(m['nome']) == search_norm:
+                code = str(m['id'])[:6] # IBGE 6 digits
+                eprint(f" > Encontrado: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code}")
+                return code
+                
+        eprint(f"ERRO: Cidade '{city_arg}' nao encontrada no IBGE.")
+        sys.exit(1)
+    except Exception as e:
+        eprint(f"ERRO na consulta ao IBGE: {e}")
+        sys.exit(1)
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -679,7 +714,7 @@ def main():
     current_year = datetime.date.today().year
     parser.add_argument('--end-year', type=int, default=current_year, help="Ano final da análise (padrão: ano atual).")
     parser.add_argument('--state', type=str, nargs='+', help="Filtrar por Sigla(s) do Estado (Ex: RS SP).")
-    parser.add_argument('--city', type=str, nargs='+', help="Filtrar por Código IBGE do Município (6 dígitos).")
+    parser.add_argument('--city', type=str, nargs='+', help="Filtrar por Nome da Cidade (ex: Veranópolis) ou Código IBGE (6 dígitos).")
     
     parser.add_argument('--top', type=int, help="Limita o gráfico para exibir apenas as N vacinas no topo do ranking.")
     parser.add_argument('--bottom', type=int, help="Exibe as N vacinas na base do ranking.")
@@ -712,6 +747,9 @@ def main():
         
     if args.chart == 'infographic' and (not args.search or len(args.search) > 1):
         parser.error("O grafico 'infographic' requer exatamente UMA vacina definida em --search. Para comparar varias, use --chart complications.")
+        
+    if args.city:
+        args.city = [resolve_city_name(c) for c in args.city]
         
     if not args.update and (args.search or args.until):
         import duckdb
