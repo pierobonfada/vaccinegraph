@@ -710,6 +710,9 @@ def main():
     if args.end_year > current_year:
         parser.error(f"O --end-year ({args.end_year}) nao pode estar no futuro (ano atual: {current_year}).")
         
+    if args.chart == 'infographic' and (not args.search or len(args.search) > 1):
+        parser.error("O grafico 'infographic' requer exatamente UMA vacina definida em --search. Para comparar varias, use --chart complications.")
+        
     if not args.update and (args.search or args.until):
         import duckdb
         db_path = os.path.join(RAW_DATA_DIR, "Doses_Residencia.parquet")
