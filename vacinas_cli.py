@@ -281,7 +281,18 @@ def generate_infographic(res, total_doses, output_file=None):
     
     fig.text(0.5, 0.91, f"Total de Doses Aplicadas (SI-PNI): {doses_str} | Notificações VigiMed: {comps_str} ({pct:.6f}%)", ha='center', fontsize=14, color='#7f8c8d')
 
-    gs = fig.add_gridspec(2, 3, wspace=0.3, hspace=0.4)
+
+    if res.get('total_obitos', 0) > 0:
+        obito_msg = f"⚠ Esta vacina teve {res['total_obitos']} casos reportados que evoluíram para óbito."
+        obito_color = '#c0392b'
+    else:
+        obito_msg = "✅ Esta vacina não teve NENHUM caso reportado de óbito neste período."
+        obito_color = '#27ae60'
+        
+    fig.text(0.5, 0.02, obito_msg, ha='center', va='bottom', fontsize=12, color=obito_color, fontweight='bold', bbox=dict(facecolor='#ffffff', edgecolor=obito_color, boxstyle='round,pad=0.5'))
+    
+    gs = fig.add_gridspec(2, 3, wspace=0.3, hspace=0.4, bottom=0.08)
+
 
     # 1. Donut chart (Simples vs Graves)
     ax_donut = fig.add_subplot(gs[:, 0])
@@ -331,10 +342,10 @@ def generate_infographic(res, total_doses, output_file=None):
 
     # Middle Col: Reactions
     ax_sim = fig.add_subplot(gs[0, 1])
-    plot_barh(ax_sim, res['top_simple'], '#2980b9', 'Top 5 Complicações SIMPLES')
+    plot_barh(ax_sim, res['top_simple'], '#2980b9', 'Top 10 Complicações SIMPLES')
     
     ax_sev = fig.add_subplot(gs[1, 1])
-    plot_barh(ax_sev, res['top_severe'], '#d35400', 'Top 5 Complicações GRAVES (incl. Óbitos)')
+    plot_barh(ax_sev, res['top_severe'], '#d35400', 'Top 10 Complicações GRAVES (incl. Óbitos)')
 
     # Right Col: Demographics
     ax_dem_sex = fig.add_subplot(gs[0, 2])
@@ -352,7 +363,7 @@ def generate_infographic(res, total_doses, output_file=None):
     ax_dem_age = fig.add_subplot(gs[1, 2])
     plot_barh(ax_dem_age, res['demographics']['age'], '#16a085', 'Faixa Etária (VigiMed)')
 
-    plt.tight_layout(rect=[0, 0, 1, 0.88])
+    plt.tight_layout(rect=[0, 0.06, 1, 0.88])
     handle_output(fig, output_file)
 
 def handle_output(fig, output_file):
@@ -510,7 +521,7 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
         fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
         plt.tight_layout(rect=[0, 0.05, 1, 0.88])
     else:
-        plt.tight_layout(rect=[0, 0, 1, 0.88])
+        plt.tight_layout(rect=[0, 0.06, 1, 0.88])
         
     handle_output(fig, output_file)
 def generate_profile_chart(df, title, output_file=None):
@@ -863,7 +874,7 @@ def main():
         def expand_reactions(df_subset):
             if df_subset.empty: return {}
             s = df_subset['REACAO_EVENTO_ADVERSO_MEDDRA'].dropna().str.split('|').explode().str.strip()
-            return s.value_counts().head(5).to_dict()
+            return s.value_counts().head(10).to_dict()
             
         is_death = df_v_filtered['DESFECHO'].str.contains('óbito|fatal', case=False, na=False) | df_v_filtered['GRAVIDADE'].str.contains('óbito|fatal', case=False, na=False)
         is_severe = (df_v_filtered['GRAVE'] == 'Sim') | is_death
@@ -871,6 +882,7 @@ def main():
         
         res = {
             'vaccine_name': vaccine_name,
+            'total_obitos': int(is_death.sum()),
             'counts': {
                 'Graves (incl. Óbitos)': int(is_severe.sum()),
                 'Simples': int(is_simple.sum())
