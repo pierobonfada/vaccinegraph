@@ -21,26 +21,13 @@ def resolve_city_name(city_arg):
     if city_arg.isdigit() and len(city_arg) == 6:
         return city_arg
         
-    import urllib.request
     import json
-    import gzip
     import os
     
     ibge_cache = os.path.join(DATA_DIR, "cidades_ibge.json")
     if not os.path.exists(ibge_cache):
-        eprint(f"Baixando banco de dados estatico do IBGE pela primeira e unica vez...")
-        try:
-            req = urllib.request.Request('https://servicodados.ibge.gov.br/api/v1/localidades/municipios', headers={'Accept-Encoding': 'gzip'})
-            with urllib.request.urlopen(req) as response:
-                if response.info().get('Content-Encoding') == 'gzip':
-                    data = json.loads(gzip.decompress(response.read()).decode('utf-8'))
-                else:
-                    data = json.loads(response.read().decode('utf-8'))
-            with open(ibge_cache, 'w', encoding='utf-8') as cache_file:
-                json.dump(data, cache_file, ensure_ascii=False)
-        except Exception as e:
-            eprint(f"ERRO ao baixar banco do IBGE: {e}")
-            sys.exit(1)
+        eprint("ERRO: Banco de dados de cidades (IBGE) nao encontrado. Execute com '--update' para baixar as bases.")
+        sys.exit(1)
             
     with open(ibge_cache, 'r', encoding='utf-8') as cache_file:
         data = json.load(cache_file)
@@ -53,11 +40,12 @@ def resolve_city_name(city_arg):
     for m in data:
         if normalize(m['nome']) == search_norm:
             code_str = str(m['id'])[:6]
-            eprint(f" > Encontrado na base local: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code_str}")
+            eprint(f" > Cidade resolvida localmente: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code_str}")
             return code_str
             
     eprint(f"ERRO: Cidade '{city_arg}' nao encontrada na base IBGE.")
     sys.exit(1)
+
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -789,17 +777,30 @@ def main():
         urls_dests = [
             ("ftp://ftp.datasus.gov.br/dissemin/publicos/Dados_Abertos/SIPNIBD/Doses_Residencia.parquet", os.path.join(RAW_DATA_DIR, "Doses_Residencia.parquet")),
             ("ftp://ftp.datasus.gov.br/dissemin/publicos/Dados_Abertos/SIPNIBD/Cobertura_Residencia.parquet", os.path.join(RAW_DATA_DIR, "Cobertura_Residencia.parquet")),
-            ("https://dados.anvisa.gov.br/dados/VigiMed_Notificacoes.csv", os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv"))
+            ("https://dados.anvisa.gov.br/dados/VigiMed_Notificacoes.csv", os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv")),
+            ("https://servicodados.ibge.gov.br/api/v1/localidades/municipios", os.path.join(DATA_DIR, "cidades_ibge.json"))
         ]
         
         def download_task(item):
             url, dest = item
             eprint(f" Iniciando download: {os.path.basename(dest)}")
-            download_file(url, dest)
+            if "municipios" in url:
+                import urllib.request
+                import gzip
+                req = urllib.request.Request(url, headers={'Accept-Encoding': 'gzip'})
+                with urllib.request.urlopen(req) as response:
+                    if response.info().get('Content-Encoding') == 'gzip':
+                        data = gzip.decompress(response.read())
+                    else:
+                        data = response.read()
+                with open(dest, 'wb') as f:
+                    f.write(data)
+            else:
+                download_file(url, dest)
             eprint(f" Concluido: {os.path.basename(dest)}")
             return True
             
-        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             executor.map(download_task, urls_dests)
             
         eprint("Todos os bancos foram atualizados com sucesso!\n")
