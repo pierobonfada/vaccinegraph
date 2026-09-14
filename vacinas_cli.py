@@ -355,7 +355,7 @@ def get_vigimed_data(severity):
     df_vigimed = df_raw.groupby('vaccine').size().reset_index(name='total_complications')
     return df_vigimed
 
-def generate_complications_chart(df, title, output_file=None):
+def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
     if df.empty:
         eprint("ERRO: Nenhum dado de complicacao para plotar.")
         sys.exit(1)
@@ -399,7 +399,13 @@ def generate_complications_chart(df, title, output_file=None):
     plt.suptitle(title, fontsize=16, fontweight='black', color='#2c3e50', y=0.98)
     ax.set_title("O eixo Y está em escala logarítmica para evidenciar a grande diferença entre doses e casos", fontsize=10, color='#7f8c8d', style='italic', pad=30)
     
-    plt.tight_layout(rect=[0, 0, 1, 0.88])
+    
+    if anomaly_msg:
+        fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
+        plt.tight_layout(rect=[0, 0.05, 1, 0.88])
+    else:
+        plt.tight_layout(rect=[0, 0, 1, 0.88])
+        
     handle_output(fig, output_file)
 def generate_profile_chart(df, title, output_file=None):
     if df.empty:
@@ -635,6 +641,21 @@ def main():
             
         # Calculate percentage
         df_merged['pct_complications'] = (df_merged['total_complications'] / df_merged['total_doses']) * 100
+        
+        # Filtro de anomalia (mais de 100% de complicacao)
+        anomalies = df_merged[df_merged['pct_complications'] > 100]
+        df_merged = df_merged[df_merged['pct_complications'] <= 100].reset_index(drop=True)
+        
+        anomaly_texts = []
+        for _, row in anomalies.iterrows():
+            v = row['vaccine']
+            c = int(row['total_complications'])
+            d = int(row['total_doses'])
+            anomaly_texts.append(f"{v} ({c} casos p/ {d} doses)")
+            
+        anomaly_msg = ""
+        if anomaly_texts:
+            anomaly_msg = "OBSERVAÇÃO: " + ", ".join(anomaly_texts) + " indicam perda de dados no SIPNI (taxa > 100%) e foram ocultadas."
 
         sort_col_map = {
             'most_complications': 'pct_complications',
@@ -648,7 +669,7 @@ def main():
         title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
         title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
         
-        generate_complications_chart(df_merged, title, output_file=args.output)
+        generate_complications_chart(df_merged, title, output_file=args.output, anomaly_msg=anomaly_msg)
     else:
         all_dfs = []
         for y in range(start, end + 1):
