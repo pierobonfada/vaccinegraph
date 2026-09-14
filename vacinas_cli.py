@@ -450,7 +450,7 @@ def generate_timeline_chart(timeline_data, output_file=None):
 
 
 
-def get_vigimed_data(severity):
+def get_vigimed_data(severity, states=None, start_year=None, end_year=None):
     vigimed_path = os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv")
     exists, status = check_file_age(vigimed_path)
     if not exists:
@@ -760,7 +760,11 @@ def main():
             sys.exit(0)
 
     if args.list_vaccines:
-        query = "SELECT DISTINCT ds_imuno FROM read_parquet('data/raw/Doses_Residencia.parquet')"
+        db_path = os.path.join(RAW_DATA_DIR, "Doses_Residencia.parquet")
+        if not os.path.exists(db_path):
+            eprint("ERRO: Banco de dados nao encontrado. Execute com '--update' para baixar.")
+            sys.exit(1)
+        query = f"SELECT DISTINCT ds_imuno FROM read_parquet('{db_path}')"
         import duckdb
         df = duckdb.query(query).to_df()
         vacinas = sorted(list(set(df['ds_imuno'].apply(padroniza_nome_vacina))))
@@ -874,7 +878,7 @@ def main():
         df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
         
         # Merge with VigiMed
-        df_vigimed = get_vigimed_data(args.severity)
+        df_vigimed = get_vigimed_data(args.severity, states=args.state, start_year=start, end_year=end)
         df_merged = pd.merge(df_doses, df_vigimed, on='vaccine', how='inner')
         
         if df_merged.empty:
