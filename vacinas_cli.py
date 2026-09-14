@@ -19,6 +19,16 @@ OUTPUT_DIR = "output"
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+
+import time
+def check_file_age(filepath, max_days=180):
+    if not os.path.exists(filepath):
+        return False, "Missing"
+    age_days = (time.time() - os.path.getmtime(filepath)) / (24 * 3600)
+    if age_days > max_days:
+        return True, "Old"
+    return True, "OK"
+
 def download_file(url, dest_path):
     try:
         ctx = ssl.create_default_context()
@@ -120,9 +130,16 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
     dest_path = os.path.join(RAW_DATA_DIR, filename)
     
     updated_any = False
-    if not os.path.exists(dest_path) or force_update:
+    exists, status = check_file_age(dest_path)
+    if not exists:
+        if not force_update:
+            eprint(f"ERRO: Banco de dados '{filename}' nao encontrado. Execute o programa com '--update' para baixar.")
+            sys.exit(1)
         download_file(url, dest_path)
         updated_any = True
+    elif status == "Old" and not force_update:
+        eprint(f"AVISO: O arquivo '{filename}' nao e atualizado ha mais de 180 dias. Considere rodar com '--update'.")
+
         
     if updated_any or not os.path.exists(DATABASE_FILE) or force_update:
         eprint(f">> Processando Parquet massivo via DuckDB (Ultra Otimizado/Out-of-Core)...")
@@ -367,17 +384,20 @@ def generate_infographic(res, total_doses, output_file=None):
     handle_output(fig, output_file)
 
 def handle_output(fig, output_file):
-    plt.tight_layout()
-    if output_file:
-        out_path = os.path.join(OUTPUT_DIR, os.path.basename(output_file)) if not os.path.isabs(output_file) else output_file
-        fig.savefig(out_path, dpi=300, bbox_inches='tight')
-        eprint(f">> Grafico salvo em: {out_path}")
-    else:
+    use_pipe = '--pipe' in sys.argv
+    if use_pipe:
         import io
         buf = io.BytesIO()
         fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
         sys.stdout.buffer.write(buf.getvalue())
-    plt.close(fig)
+    else:
+        if not output_file:
+            import datetime
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = f"grafico_{ts}.png"
+        out_path = os.path.join(OUTPUT_DIR, os.path.basename(output_file)) if not os.path.isabs(output_file) else output_file
+        fig.savefig(out_path, dpi=300, bbox_inches='tight')
+        eprint(f">> Grafico salvo em: {out_path}")
 
 def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None):
     df_doses = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n)
@@ -432,10 +452,13 @@ def generate_timeline_chart(timeline_data, output_file=None):
 
 def get_vigimed_data(severity):
     vigimed_path = os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv")
-    if not os.path.exists(vigimed_path):
-        eprint("\n[AUTOMACAO] Baixando a base do VigiMed da ANVISA...")
-        url = 'https://dados.anvisa.gov.br/dados/VigiMed_Notificacoes.csv'
-        download_file(url, vigimed_path)
+    exists, status = check_file_age(vigimed_path)
+    if not exists:
+        eprint("ERRO: Banco de dados do VigiMed nao encontrado. Execute o programa com '--update' para baixar.")
+        sys.exit(1)
+    elif status == "Old":
+        eprint("AVISO: O arquivo do VigiMed nao e atualizado ha mais de 180 dias. Considere rodar com '--update'.")
+
         
     import duckdb
     severity_filter = ""
@@ -652,7 +675,7 @@ def main():
                              " - infographic: Infográfico completo de complicações para UMA vacina específica (use --search)")
                              
     parser.add_argument('--start-year', type=int, default=2023, help="Ano inicial da análise (Mínimo: 2023).")
-    parser.add_argument('--end-year', type=int, default=2024, help="Ano final da análise.")
+    parser.add_argument('--end-year', type=int, default=2026, help="Ano final da análise.")
     parser.add_argument('--state', type=str, nargs='+', help="Filtrar por Sigla(s) do Estado (Ex: RS SP).")
     parser.add_argument('--city', type=str, nargs='+', help="Filtrar por Código IBGE do Município (6 dígitos).")
     
@@ -670,8 +693,40 @@ def main():
     parser.add_argument('--clear-cache', action='store_true', help="Limpa bases cacheadas locais do DuckDB/Parquet.")
     parser.add_argument('--list-vaccines', action='store_true', help="Lista o nome exato padronizado de todas as vacinas disponíveis para pesquisa.")
 
+    parser.add_argument('--pipe', action='store_true', help="Força a saída da imagem em binário (PNG) direto para o stdout, ideal para pipes.")
+    
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+        
     args = parser.parse_args()
     
+
+
+    if args.update:
+        eprint("\n[Atualizacao Global] Baixando bancos de dados em paralelo...")
+        import concurrent.futures
+        
+        urls_dests = [
+            ("ftp://ftp.datasus.gov.br/dissemin/publicos/Dados_Abertos/SIPNIBD/Doses_Residencia.parquet", os.path.join(RAW_DATA_DIR, "Doses_Residencia.parquet")),
+            ("ftp://ftp.datasus.gov.br/dissemin/publicos/Dados_Abertos/SIPNIBD/Cobertura_Residencia.parquet", os.path.join(RAW_DATA_DIR, "Cobertura_Residencia.parquet")),
+            ("https://dados.anvisa.gov.br/dados/VigiMed_Notificacoes.csv", os.path.join(RAW_DATA_DIR, "VigiMed_Notificacoes.csv"))
+        ]
+        
+        def download_task(item):
+            url, dest = item
+            eprint(f" Iniciando download: {os.path.basename(dest)}")
+            download_file(url, dest)
+            eprint(f" Concluido: {os.path.basename(dest)}")
+            return True
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            executor.map(download_task, urls_dests)
+            
+        eprint("Todos os bancos foram atualizados com sucesso!\n")
+        
+        if len(sys.argv) == 2:
+            sys.exit(0)
 
     if args.list_vaccines:
         query = "SELECT DISTINCT ds_imuno FROM read_parquet('data/raw/Doses_Residencia.parquet')"
