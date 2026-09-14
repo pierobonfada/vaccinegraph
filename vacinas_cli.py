@@ -166,10 +166,21 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
         eprint(">> Base cacheada ja existe.")
         return pd.read_parquet(DATABASE_FILE)
 
-def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None):
+def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None, until_terms=None, ascending=False):
+    import pandas as pd
     stats_df = stats_df.copy()
-    stats_df = stats_df.sort_values(by=sort_col, ascending=False).reset_index(drop=True)
+    stats_df = stats_df.sort_values(by=sort_col, ascending=ascending).reset_index(drop=True)
     
+    if until_terms:
+        until_terms = [s.lower() for s in until_terms]
+        max_idx = -1
+        for i, row in stats_df.iterrows():
+            if any(s in row['vaccine'].lower() for s in until_terms):
+                max_idx = max(max_idx, i)
+        if max_idx != -1:
+            top_n = max_idx + 1
+            search_terms = (search_terms or []) + until_terms
+            
     if search_terms:
         search_terms = [s.lower() for s in search_terms]
         def match_search(name):
@@ -180,7 +191,8 @@ def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=No
         
     stats_df['color'] = stats_df['is_searched'].map({True: '#2ecc71', False: '#95a5a6'})
     
-    if search_terms:
+    # Forcar para o topo apenas se nao for --until
+    if search_terms and not until_terms:
         searched_df = stats_df[stats_df['is_searched']]
         unsearched_df = stats_df[~stats_df['is_searched']]
         stats_df = pd.concat([searched_df, unsearched_df]).reset_index(drop=True)
@@ -478,6 +490,7 @@ def main():
     parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications'], default='doses', help="Tipo de grafico.")
     parser.add_argument('--search', type=str, nargs='+')
     parser.add_argument('--top', type=int)
+    parser.add_argument('--until', type=str, nargs='+', help='Lista as vacinas em ordem ate chegar nesta(s)')
     parser.add_argument('--bottom', type=int)
     parser.add_argument('--state', type=str, nargs='+', help='Estados para filtrar (ex: RS SP).')
     parser.add_argument('--city', type=str, nargs='+', help='Codigos IBGE de municipios (6 digitos).')
@@ -607,12 +620,8 @@ def main():
             'most_doses': 'total_doses'
         }
         sort_col = sort_col_map.get(args.sort, 'pct_complications')
-        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom)
-        
-        if args.sort == 'least_complications':
-            searched = df_merged[df_merged.get('is_searched', pd.Series([False]*len(df_merged)))]
-            unsearched = df_merged[~df_merged.get('is_searched', pd.Series([False]*len(df_merged)))].sort_values(sort_col, ascending=True)
-            df_merged = pd.concat([searched, unsearched]).reset_index(drop=True)
+        ascending = True if args.sort == 'least_complications' else False
+        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, until_terms=args.until, ascending=ascending)
         state_str = f" (UF: {' '.join(args.state)})" if args.state else " (Brasil)"
         title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
         title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
