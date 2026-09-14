@@ -281,19 +281,19 @@ def generate_infographic(res, total_doses, output_file=None):
     
     fig.text(0.5, 0.91, f"Total de Doses Aplicadas (SI-PNI): {doses_str} | Notificações VigiMed: {comps_str} ({pct:.6f}%)", ha='center', fontsize=14, color='#7f8c8d')
 
-    gs = fig.add_gridspec(3, 3, wspace=0.3, hspace=0.6)
+    gs = fig.add_gridspec(2, 3, wspace=0.3, hspace=0.4)
 
-    # 1. Donut chart (Simples vs Graves vs Óbitos)
+    # 1. Donut chart (Simples vs Graves)
     ax_donut = fig.add_subplot(gs[:, 0])
-    labels = ['Simples', 'Graves', 'Óbitos']
-    sizes = [res['counts']['Simples'], res['counts']['Graves'], res['counts']['Óbitos']]
-    colors = ['#3498db', '#e67e22', '#c0392b']
-    explode = (0.05, 0.05, 0.1)
+    labels = ['Simples', 'Graves (incl. Óbitos)']
+    sizes = [res['counts']['Simples'], res['counts']['Graves (incl. Óbitos)']]
+    colors = ['#3498db', '#e67e22']
+    explode = (0.05, 0.05)
 
-    l_f = [labels[i] for i in range(3) if sizes[i] > 0]
-    s_f = [sizes[i] for i in range(3) if sizes[i] > 0]
-    c_f = [colors[i] for i in range(3) if sizes[i] > 0]
-    e_f = [explode[i] for i in range(3) if sizes[i] > 0]
+    l_f = [labels[i] for i in range(2) if sizes[i] > 0]
+    s_f = [sizes[i] for i in range(2) if sizes[i] > 0]
+    c_f = [colors[i] for i in range(2) if sizes[i] > 0]
+    e_f = [explode[i] for i in range(2) if sizes[i] > 0]
 
     if s_f:
         wedges, texts, autotexts = ax_donut.pie(s_f, explode=e_f, labels=l_f, colors=c_f, autopct='%1.1f%%', shadow=False, startangle=140, textprops=dict(color="w", weight="bold"))
@@ -334,10 +334,7 @@ def generate_infographic(res, total_doses, output_file=None):
     plot_barh(ax_sim, res['top_simple'], '#2980b9', 'Top 5 Complicações SIMPLES')
     
     ax_sev = fig.add_subplot(gs[1, 1])
-    plot_barh(ax_sev, res['top_severe'], '#d35400', 'Top 5 Complicações GRAVES')
-    
-    ax_dea = fig.add_subplot(gs[2, 1])
-    plot_barh(ax_dea, res['top_deaths'], '#c0392b', 'Causas (Óbitos)')
+    plot_barh(ax_sev, res['top_severe'], '#d35400', 'Top 5 Complicações GRAVES (incl. Óbitos)')
 
     # Right Col: Demographics
     ax_dem_sex = fig.add_subplot(gs[0, 2])
@@ -352,7 +349,7 @@ def generate_infographic(res, total_doses, output_file=None):
     else:
         ax_dem_sex.axis('off')
         
-    ax_dem_age = fig.add_subplot(gs[1:, 2])
+    ax_dem_age = fig.add_subplot(gs[1, 2])
     plot_barh(ax_dem_age, res['demographics']['age'], '#16a085', 'Faixa Etária (VigiMed)')
 
     plt.tight_layout(rect=[0, 0, 1, 0.88])
@@ -869,17 +866,15 @@ def main():
             return s.value_counts().head(5).to_dict()
             
         is_death = df_v_filtered['DESFECHO'].str.contains('óbito|fatal', case=False, na=False) | df_v_filtered['GRAVIDADE'].str.contains('óbito|fatal', case=False, na=False)
-        is_severe = (df_v_filtered['GRAVE'] == 'Sim') & (~is_death)
-        is_simple = (df_v_filtered['GRAVE'] == 'Não') & (~is_death)
+        is_severe = (df_v_filtered['GRAVE'] == 'Sim') | is_death
+        is_simple = (df_v_filtered['GRAVE'] == 'Não') & (~is_severe)
         
         res = {
             'vaccine_name': vaccine_name,
             'counts': {
-                'Óbitos': int(is_death.sum()),
-                'Graves': int(is_severe.sum()),
+                'Graves (incl. Óbitos)': int(is_severe.sum()),
                 'Simples': int(is_simple.sum())
             },
-            'top_deaths': expand_reactions(df_v_filtered[is_death]),
             'top_severe': expand_reactions(df_v_filtered[is_severe]),
             'top_simple': expand_reactions(df_v_filtered[is_simple]),
             'demographics': {
