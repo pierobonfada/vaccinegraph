@@ -360,12 +360,12 @@ def generate_complications_chart(df, title, output_file=None):
     ylim = ax.get_ylim()
     ax.set_ylim(ylim[0], ylim[1] * 3.5)
     
-    fig.legend(loc='upper center', bbox_to_anchor=(0.5, 0.93), ncol=2, frameon=False, fontsize=12)
+    fig.legend(loc='upper center', bbox_to_anchor=(0.5, 0.90), ncol=2, frameon=False, fontsize=12)
     
     plt.suptitle(title, fontsize=16, fontweight='black', color='#2c3e50', y=0.98)
     ax.set_title("O eixo Y está em escala logarítmica para evidenciar a grande diferença entre doses e casos", fontsize=10, color='#7f8c8d', style='italic', pad=30)
     
-    plt.tight_layout(rect=[0, 0, 1, 0.92])
+    plt.tight_layout(rect=[0, 0, 1, 0.88])
     handle_output(fig, output_file)
 def generate_profile_chart(df, title, output_file=None):
     if df.empty:
@@ -613,10 +613,9 @@ def main():
             searched = df_merged[df_merged.get('is_searched', pd.Series([False]*len(df_merged)))]
             unsearched = df_merged[~df_merged.get('is_searched', pd.Series([False]*len(df_merged)))].sort_values(sort_col, ascending=True)
             df_merged = pd.concat([searched, unsearched]).reset_index(drop=True)
-        title = f"Doses vs Complicações (VigiMed)"
-        title += f"\nGravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
-        if args.search: title += f"\n[{', '.join(args.search)}]"
-        if args.state: title += f" ({' '.join(args.state)})"
+        state_str = f" (UF: {' '.join(args.state)})" if args.state else " (Brasil)"
+        title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
+        title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
         
         generate_complications_chart(df_merged, title, output_file=args.output)
     else:
