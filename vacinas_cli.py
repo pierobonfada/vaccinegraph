@@ -261,6 +261,101 @@ def format_millions(x, pos):
         return f'{x*1e-3:g} Mil'
     return f'{x:g}'
 
+
+def generate_infographic(res, total_doses, output_file=None):
+    if not res:
+        eprint("Nenhuma notificacao encontrada para esta vacina.")
+        sys.exit(1)
+        
+    fig = plt.figure(figsize=(16, 10))
+    fig.patch.set_facecolor('#f4f6f9')
+
+    plt.suptitle(f"INFOGRÁFICO DE SEGURANÇA: {res['vaccine_name'].upper()}", fontsize=22, fontweight='black', color='#2c3e50', y=0.96)
+    
+    total_comps = sum(res['counts'].values())
+    pct = (total_comps / total_doses * 100) if total_doses > 0 else 0
+    doses_str = f'{int(total_doses):,}'.replace(',', '.')
+    comps_str = f'{int(total_comps):,}'.replace(',', '.')
+    
+    fig.text(0.5, 0.91, f"Total de Doses Aplicadas (SI-PNI): {doses_str} | Notificações VigiMed: {comps_str} ({pct:.6f}%)", ha='center', fontsize=14, color='#7f8c8d')
+
+    gs = fig.add_gridspec(3, 3, wspace=0.3, hspace=0.6)
+
+    # 1. Donut chart (Simples vs Graves vs Óbitos)
+    ax_donut = fig.add_subplot(gs[:, 0])
+    labels = ['Simples', 'Graves', 'Óbitos']
+    sizes = [res['counts']['Simples'], res['counts']['Graves'], res['counts']['Óbitos']]
+    colors = ['#3498db', '#e67e22', '#c0392b']
+    explode = (0.05, 0.05, 0.1)
+
+    l_f = [labels[i] for i in range(3) if sizes[i] > 0]
+    s_f = [sizes[i] for i in range(3) if sizes[i] > 0]
+    c_f = [colors[i] for i in range(3) if sizes[i] > 0]
+    e_f = [explode[i] for i in range(3) if sizes[i] > 0]
+
+    if s_f:
+        wedges, texts, autotexts = ax_donut.pie(s_f, explode=e_f, labels=l_f, colors=c_f, autopct='%1.1f%%', shadow=False, startangle=140, textprops=dict(color="w", weight="bold"))
+        ax_donut.legend(wedges, l_f, title="Gravidade", loc="lower center", bbox_to_anchor=(0.5, -0.1))
+        plt.setp(autotexts, size=11, weight="bold")
+        centre_circle = plt.Circle((0,0),0.65,fc='#f4f6f9')
+        ax_donut.add_artist(centre_circle)
+    ax_donut.set_title('Proporção de Notificações', fontweight='bold', fontsize=14, color='#34495e')
+
+    def plot_barh(ax, data, color, title):
+        if not data:
+            ax.text(0.5, 0.5, "Sem Dados", ha='center', va='center', color='#95a5a6')
+            ax.axis('off')
+            ax.set_title(title, fontweight='bold', color=color)
+            return
+        
+        y_pos = np.arange(len(data))
+        values = list(data.values())
+        keys = list(data.keys())
+        # Wrap long labels
+        import textwrap
+        keys = ['\n'.join(textwrap.wrap(k, width=30)) for k in keys]
+        
+        ax.barh(y_pos, values, color=color)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(keys, fontsize=9)
+        ax.invert_yaxis()
+        ax.set_title(title, fontweight='bold', color=color)
+        for i, v in enumerate(values):
+            ax.text(v, i, f' {v}', va='center', fontsize=9, fontweight='bold')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.set_xticks([])
+
+    # Middle Col: Reactions
+    ax_sim = fig.add_subplot(gs[0, 1])
+    plot_barh(ax_sim, res['top_simple'], '#2980b9', 'Top 5 Complicações SIMPLES')
+    
+    ax_sev = fig.add_subplot(gs[1, 1])
+    plot_barh(ax_sev, res['top_severe'], '#d35400', 'Top 5 Complicações GRAVES')
+    
+    ax_dea = fig.add_subplot(gs[2, 1])
+    plot_barh(ax_dea, res['top_deaths'], '#c0392b', 'Causas (Óbitos)')
+
+    # Right Col: Demographics
+    ax_dem_sex = fig.add_subplot(gs[0, 2])
+    if res['demographics']['sex']:
+        keys = list(res['demographics']['sex'].keys())
+        values = list(res['demographics']['sex'].values())
+        colors = ['#9b59b6' if k.lower()=='feminino' else '#34495e' if k.lower()=='masculino' else '#95a5a6' for k in keys]
+        ax_dem_sex.bar(keys, values, color=colors)
+        ax_dem_sex.set_title('Distribuição por Sexo', fontweight='bold', color='#8e44ad')
+        ax_dem_sex.spines['top'].set_visible(False)
+        ax_dem_sex.spines['right'].set_visible(False)
+    else:
+        ax_dem_sex.axis('off')
+        
+    ax_dem_age = fig.add_subplot(gs[1:, 2])
+    plot_barh(ax_dem_age, res['demographics']['age'], '#16a085', 'Faixa Etária (VigiMed)')
+
+    plt.tight_layout(rect=[0, 0, 1, 0.88])
+    handle_output(fig, output_file)
+
 def handle_output(fig, output_file):
     plt.tight_layout()
     if output_file:
@@ -520,26 +615,65 @@ def generate_total_yearly_chart(yearly_data, output_file=None, title="Total de D
     handle_output(fig, output_file)
 
 def main():
-    parser = argparse.ArgumentParser(description="Analise DADOS REAIS de vacinacao (DATASUS >= 2023)")
+    parser = argparse.ArgumentParser(
+        description="VaccineGraph - Sistema Analítico de Vacinação (SI-PNI + VigiMed)\
+"
+                    "Cruza dados abertos de vacinação com notificações de eventos adversos.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
     
-    parser.add_argument('--year', type=int, help="Ano de pesquisa (ex: 2023, 2024). Substituto para start-year e end-year se for apenas 1 ano.")
-    parser.add_argument('--start-year', type=int, help="Ano inicial (min: 2023).")
-    parser.add_argument('--end-year', type=int, help="Ano final.")
-    parser.add_argument('--clear-cache', action='store_true', help="Deleta todos os dados baixados e o banco consolidado.")
-    parser.add_argument('--update', action='store_true', help="Forca o download ignorando cache.")
-    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications'], default='doses', help="Tipo de grafico.")
-    parser.add_argument('--search', type=str, nargs='+')
-    parser.add_argument('--top', type=int)
-    parser.add_argument('--until', type=str, nargs='+', help='Lista as vacinas em ordem ate chegar nesta(s)')
-    parser.add_argument('--bottom', type=int)
-    parser.add_argument('--state', type=str, nargs='+', help='Estados para filtrar (ex: RS SP).')
-    parser.add_argument('--city', type=str, nargs='+', help='Codigos IBGE de municipios (6 digitos).')
-    parser.add_argument('-o', '--output', type=str, help='Arquivo de saida para a imagem PNG. (Salvo na pasta output/)')
-    parser.add_argument('--severity', choices=['all', 'mild', 'severe', 'death'], default='all', help='Filtrar gravidade das complicacoes (VigiMed)')
-    parser.add_argument('--sort', choices=['most_complications', 'least_complications', 'most_doses'], default='most_complications', help='Criterio de ordenacao')
+    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications', 'infographic'], default='doses', 
+                        help="Define qual gráfico gerar:\
+"
+                             " - doses: Vacinas mais aplicadas (Total de Doses)\
+"
+                             " - people: Vacinas mais aplicadas (Total de Pessoas)\
+"
+                             " - timeline: Série histórica por vacina ao longo dos anos\
+"
+                             " - total_yearly: Total de doses aplicadas ano a ano\
+"
+                             " - monthly: Série histórica mensal detalhada\
+"
+                             " - profile: Perfil demográfico (idade, sexo, raça) dos vacinados\
+"
+                             " - complications: Taxa de complicações (SI-PNI vs VigiMed)\
+"
+                             " - infographic: Infográfico completo de complicações para UMA vacina específica (use --search)")
+                             
+    parser.add_argument('--start-year', type=int, default=2023, help="Ano inicial da análise (Mínimo: 2023).")
+    parser.add_argument('--end-year', type=int, default=2024, help="Ano final da análise.")
+    parser.add_argument('--state', type=str, nargs='+', help="Filtrar por Sigla(s) do Estado (Ex: RS SP).")
+    parser.add_argument('--city', type=str, nargs='+', help="Filtrar por Código IBGE do Município (6 dígitos).")
     
+    parser.add_argument('--top', type=int, help="Limita o gráfico para exibir apenas as N vacinas no topo do ranking.")
+    parser.add_argument('--bottom', type=int, help="Exibe as N vacinas na base do ranking.")
+    
+    parser.add_argument('--search', type=str, nargs='+', help="Busca vacinas específicas por nome (Ex: HPV Influenza). Em infographic, define o alvo principal.")
+    parser.add_argument('--until', type=str, nargs='+', help="Busca dinâmica: lista o ranking progressivamente até encontrar a vacina desejada.")
+    
+    parser.add_argument('--severity', type=str, choices=['simple', 'severe', 'death', 'all'], default='severe', help="Filtra a gravidade das complicações no VigiMed (padrão: severe).")
+    parser.add_argument('--sort', type=str, choices=['most_doses', 'most_complications', 'least_complications'], default='most_complications', help="Ordenação do gráfico de complicações.")
+    
+    parser.add_argument('-o', '--output', type=str, help="Salva a imagem no caminho especificado ao invés de abrir uma janela interativa.")
+    parser.add_argument('--update', action='store_true', help="Força o download de novos dados governamentais (ignora cache local).")
+    parser.add_argument('--clear-cache', action='store_true', help="Limpa bases cacheadas locais do DuckDB/Parquet.")
+    parser.add_argument('--list-vaccines', action='store_true', help="Lista o nome exato padronizado de todas as vacinas disponíveis para pesquisa.")
+
     args = parser.parse_args()
     
+
+    if args.list_vaccines:
+        query = "SELECT DISTINCT ds_imuno FROM read_parquet('data/raw/Doses_Residencia.parquet')"
+        import duckdb
+        df = duckdb.query(query).to_df()
+        vacinas = sorted(list(set(df['ds_imuno'].apply(padroniza_nome_vacina))))
+        print("\n=== Vacinas Disponíveis para Busca ===")
+        for v in vacinas:
+            print(f" - {v}")
+        print("======================================\n")
+        sys.exit(0)
+
     if args.clear_cache:
         eprint(">> Limpando o cache e deletando gigabytes de dados...")
         import shutil
@@ -682,6 +816,72 @@ def main():
         title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
         
         generate_complications_chart(df_merged, title, output_file=args.output, anomaly_msg=anomaly_msg)
+    elif args.chart == 'infographic':
+        if not args.search:
+            eprint("ERRO: Para o infográfico, você deve especificar uma vacina usando --search")
+            sys.exit(1)
+            
+        vaccine_search = args.search[0].lower()
+        
+        # 1. Total doses
+        all_dfs = []
+        for y in range(start, end + 1):
+            df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='doses')
+            if not df_y.empty:
+                all_dfs.append(df_y)
+        if all_dfs:
+            df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
+        else:
+            eprint("Sem dados de doses para o periodo.")
+            sys.exit(1)
+            
+        # 2. VigiMed
+        df_v = get_vigimed_data('all') # Need custom query since we need all severity levels
+        # Wait, get_vigimed_data currently filters by severity and aggregates! We need raw parsed!
+        # Let's do it here:
+        df_v_raw = pd.read_csv('data/raw/VigiMed_Notificacoes.csv', sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
+        df_v_raw = df_v_raw.dropna(subset=['NOME_MEDICAMENTO_WHODRUG'])
+        df_v_raw['vaccine_std'] = df_v_raw['NOME_MEDICAMENTO_WHODRUG'].apply(padroniza_nome_vacina)
+        
+        df_v_filtered = df_v_raw[df_v_raw['vaccine_std'].str.lower().str.contains(vaccine_search)]
+        if df_v_filtered.empty:
+            eprint("Nenhuma notificacao encontrada para esta pesquisa.")
+            sys.exit(1)
+            
+        vaccine_name = df_v_filtered['vaccine_std'].iloc[0]
+        df_v_filtered = df_v_filtered[df_v_filtered['vaccine_std'] == vaccine_name]
+        
+        # Match doses
+        match_dose = df_doses[df_doses['vaccine'] == vaccine_name]
+        total_doses = match_dose.iloc[0]['total_doses'] if not match_dose.empty else 0
+        
+        def expand_reactions(df_subset):
+            if df_subset.empty: return {}
+            s = df_subset['REACAO_EVENTO_ADVERSO_MEDDRA'].dropna().str.split('|').explode().str.strip()
+            return s.value_counts().head(5).to_dict()
+            
+        is_death = (df_v_filtered['DESFECHO'] == 'Óbito') | (df_v_filtered['GRAVIDADE'] == 'Óbito')
+        is_severe = (df_v_filtered['GRAVE'] == 'Sim') & (~is_death)
+        is_simple = (df_v_filtered['GRAVE'] == 'Não') & (~is_death)
+        
+        res = {
+            'vaccine_name': vaccine_name,
+            'counts': {
+                'Óbitos': int(is_death.sum()),
+                'Graves': int(is_severe.sum()),
+                'Simples': int(is_simple.sum())
+            },
+            'top_deaths': expand_reactions(df_v_filtered[is_death]),
+            'top_severe': expand_reactions(df_v_filtered[is_severe]),
+            'top_simple': expand_reactions(df_v_filtered[is_simple]),
+            'demographics': {
+                'sex': df_v_filtered['SEXO'].value_counts().to_dict(),
+                'age': df_v_filtered['GRUPO_IDADE'].value_counts().to_dict()
+            }
+        }
+        
+        generate_infographic(res, total_doses, output_file=args.output)
+
     else:
         all_dfs = []
         for y in range(start, end + 1):
