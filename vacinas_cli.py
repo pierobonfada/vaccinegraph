@@ -201,7 +201,7 @@ def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=No
                 max_idx = max(max_idx, i)
         if max_idx != -1:
             top_n = max_idx + 1
-            search_terms = (search_terms or []) + until_terms
+            # Removido: search_terms = (search_terms or []) + until_terms para não forçar a cor verde
             
     if search_terms:
         search_terms = [s.lower() for s in search_terms]
