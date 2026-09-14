@@ -45,7 +45,29 @@ def download_file(url, dest_path):
 
 def padroniza_nome_vacina(nome):
     nome = str(nome).upper()
-    if 'COVID' in nome: return 'COVID-19'
+    
+    # COVID-19 Subtypes
+    covid_keywords = ['COVID', 'CORONAVAC', 'ASTRAZENECA', 'PFIZER', 'COMIRNATY', 'JANSSEN', 'BUTANTAN', 'FIOCRUZ', 'COVISHIELD', 'SPIKEVAX', 'MODERNA']
+    if any(k in nome for k in covid_keywords):
+        if 'PFIZER' in nome or 'COMIRNATY' in nome or 'BIONTECH' in nome:
+            return 'COVID-19 (Pfizer)'
+        if 'CORONAVAC' in nome or 'SINOVAC' in nome or 'BUTANTAN' in nome:
+            return 'COVID-19 (Coronavac)'
+        if 'ASTRAZENECA' in nome or 'FIOCRUZ' in nome or 'COVISHIELD' in nome or 'CHADOX' in nome:
+            return 'COVID-19 (AstraZeneca)'
+        if 'JANSSEN' in nome or 'AD26' in nome:
+            return 'COVID-19 (Janssen)'
+        if 'MODERNA' in nome or 'SPIKEVAX' in nome:
+            return 'COVID-19 (Moderna)'
+        
+        # Generic names in VigiMed or SIPNI that imply a subtype
+        if 'INATIVADA' in nome and 'SINOVAC' not in nome and 'BHARAT' not in nome and 'SINOPHARM' not in nome:
+            return 'COVID-19 (Coronavac)' # In BR, generic "inactivated covid" is Coronavac
+        if 'RECOMBINANTE' in nome and 'ASTRAZENECA' not in nome and 'JANSSEN' not in nome and 'GAMALEYA' not in nome:
+            return 'COVID-19 (AstraZeneca)' # Generic "recombinant covid" is usually AZ
+            
+        return 'COVID-19 (Outras/Genérica)'
+        
     if 'INFLUENZA' in nome and 'HAEMOPHILUS' not in nome: return 'Influenza'
     if 'HAEMOPHILUS' in nome: return 'Haemophilus influenzae b (Hib)'
     if 'POLIO' in nome and 'ORAL' in nome: return 'Poliomielite Oral (VOP)'
