@@ -5,6 +5,7 @@ import sys
 import argparse
 import urllib.request
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import warnings
@@ -202,6 +203,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
 
 def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None, until_terms=None, ascending=False):
     import pandas as pd
+    import numpy as np
     stats_df = stats_df.copy()
     stats_df = stats_df.sort_values(by=sort_col, ascending=ascending).reset_index(drop=True)
     
@@ -296,7 +298,7 @@ def generate_infographic(res, total_doses, output_file=None):
     if s_f:
         wedges, texts, autotexts = ax_donut.pie(s_f, explode=e_f, labels=l_f, colors=c_f, autopct='%1.1f%%', shadow=False, startangle=140, textprops=dict(color="w", weight="bold"))
         ax_donut.legend(wedges, l_f, title="Gravidade", loc="lower center", bbox_to_anchor=(0.5, -0.1))
-        plt.setp(autotexts, size=11, weight="bold")
+        plt.setp(autotexts, size=11, weight="bold", color="black")
         centre_circle = plt.Circle((0,0),0.65,fc='#f4f6f9')
         ax_donut.add_artist(centre_circle)
     ax_donut.set_title('Proporção de Notificações', fontweight='bold', fontsize=14, color='#34495e')
@@ -841,6 +843,12 @@ def main():
         # Let's do it here:
         df_v_raw = pd.read_csv('data/raw/VigiMed_Notificacoes.csv', sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
         df_v_raw = df_v_raw.dropna(subset=['NOME_MEDICAMENTO_WHODRUG'])
+        
+        if args.state:
+            df_v_raw = df_v_raw[df_v_raw['UF'].isin(args.state)]
+            
+        df_v_raw['ano_noti'] = df_v_raw['DATA_INCLUSAO_SISTEMA'].str.extract(r'(\d{4})').astype(float)
+        df_v_raw = df_v_raw[(df_v_raw['ano_noti'] >= start) & (df_v_raw['ano_noti'] <= end)]
         df_v_raw['vaccine_std'] = df_v_raw['NOME_MEDICAMENTO_WHODRUG'].apply(padroniza_nome_vacina)
         
         df_v_filtered = df_v_raw[df_v_raw['vaccine_std'].str.lower().str.contains(vaccine_search)]
@@ -860,7 +868,7 @@ def main():
             s = df_subset['REACAO_EVENTO_ADVERSO_MEDDRA'].dropna().str.split('|').explode().str.strip()
             return s.value_counts().head(5).to_dict()
             
-        is_death = (df_v_filtered['DESFECHO'] == 'Óbito') | (df_v_filtered['GRAVIDADE'] == 'Óbito')
+        is_death = df_v_filtered['DESFECHO'].str.contains('óbito|fatal', case=False, na=False) | df_v_filtered['GRAVIDADE'].str.contains('óbito|fatal', case=False, na=False)
         is_severe = (df_v_filtered['GRAVE'] == 'Sim') & (~is_death)
         is_simple = (df_v_filtered['GRAVE'] == 'Não') & (~is_death)
         
