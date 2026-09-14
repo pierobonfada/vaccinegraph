@@ -675,7 +675,9 @@ def main():
                              " - infographic: Infográfico completo de complicações para UMA vacina específica (use --search)")
                              
     parser.add_argument('--start-year', type=int, default=2023, help="Ano inicial da análise (Mínimo: 2023).")
-    parser.add_argument('--end-year', type=int, default=2026, help="Ano final da análise.")
+    import datetime
+    current_year = datetime.date.today().year
+    parser.add_argument('--end-year', type=int, default=current_year, help="Ano final da análise (padrão: ano atual).")
     parser.add_argument('--state', type=str, nargs='+', help="Filtrar por Sigla(s) do Estado (Ex: RS SP).")
     parser.add_argument('--city', type=str, nargs='+', help="Filtrar por Código IBGE do Município (6 dígitos).")
     
@@ -700,6 +702,35 @@ def main():
         sys.exit(1)
         
     args = parser.parse_args()
+
+    if args.start_year > args.end_year:
+        parser.error("O --start-year nao pode ser maior que o --end-year.")
+    if args.start_year < 2023:
+        parser.error("O sistema moderno SIPNIBD (Dados Abertos) so possui registros a partir de 2023. Ajuste o --start-year.")
+    if args.end_year > current_year:
+        parser.error(f"O --end-year ({args.end_year}) nao pode estar no futuro (ano atual: {current_year}).")
+        
+    if not args.update and (args.search or args.until):
+        import duckdb
+        db_path = os.path.join(RAW_DATA_DIR, "Doses_Residencia.parquet")
+        if os.path.exists(db_path):
+            query = "SELECT DISTINCT ds_imuno FROM read_parquet('data/raw/Doses_Residencia.parquet')"
+            try:
+                df_vac = duckdb.query(query).to_df()
+                vacinas = sorted(list(set(df_vac['ds_imuno'].apply(padroniza_nome_vacina))))
+                
+                def check_terms(terms, arg_name):
+                    if not terms: return
+                    for term in terms:
+                        term_lower = term.lower()
+                        if not any(term_lower in v.lower() for v in vacinas):
+                            parser.error(f"O termo '{term}' passado em {arg_name} nao corresponde a NENHUMA vacina no banco de dados.\nUse --list-vaccines para ver as opcoes disponiveis.")
+                
+                check_terms(args.search, '--search')
+                check_terms(args.until, '--until')
+            except Exception as e:
+                pass # Ignora erros de validacao se o banco estiver corrompido
+
     
 
 
