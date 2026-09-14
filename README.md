@@ -16,7 +16,9 @@ O CLI é altamente modular. Aqui estão alguns dos principais cenários suportad
 Quais foram as vacinas mais aplicadas no país em um determinado intervalo de tempo?
 Comando utilizado para buscar o **Top 10** nacional entre 2023 e 2024:
 ```bash
-./vacinas_cli.py --chart doses --start-year 2023 --end-year 2024 --top 10 -o ex_doses_brasil.png
+./vacinas_cli.py --chart doses \
+    --start-year 2023 --end-year 2024 \
+    --top 10 -o ex_doses_brasil.png
 ```
 ![Vacinas mais aplicadas](ex_doses_brasil.png)
 
@@ -25,7 +27,10 @@ Comando utilizado para buscar o **Top 10** nacional entre 2023 e 2024:
 ### 2. Linha do Tempo Mensal (Destaque e Filtro Regional)
 Exibir a evolução temporal (meses) em que determinadas vacinas (ex: Gripe/Influenza, COVID e HPV) foram aplicadas, isolando os dados de um estado específico (Ex: Rio Grande do Sul). O programa compila de forma inteligente todos os meses dentro do intervalo de anos informado.
 ```bash
-./vacinas_cli.py --chart monthly --start-year 2023 --end-year 2024 --state RS --search Influenza COVID HPV -o ex_mensal_rs.png
+./vacinas_cli.py --chart monthly \
+    --start-year 2023 --end-year 2024 \
+    --state RS --search Influenza COVID HPV \
+    -o ex_mensal_rs.png
 ```
 ![Série Histórica RS](ex_mensal_rs.png)
 
@@ -37,7 +42,10 @@ Ao invés de limitar o gráfico a um top "N" fixo, o usuário pode pedir para li
 O motor analisa todas as vacinas, ordena da mais frequente para a menos frequente e encontra a posição final de `HPV` ou `Influenza` (a que estiver mais longe), plotando todas até aquele ponto. 
 *(Observação: Neste modo dinâmico, as barras obedecem sua coloração e ordenação naturais).*
 ```bash
-./vacinas_cli.py --chart complications --severity severe --sort most_complications --start-year 2023 --end-year 2024 --until HPV Influenza -o ex_complicacoes_until.png
+./vacinas_cli.py --chart complications \
+    --severity severe --sort most_complications \
+    --start-year 2023 --end-year 2024 \
+    --until HPV Influenza -o ex_complicacoes_until.png
 ```
 ![Complicações até HPV/Influenza](ex_complicacoes_until.png)
 
@@ -48,7 +56,10 @@ Quando queremos gerar um gráfico com um número restrito e amigável para apres
 
 O programa extrai o Top natural, e se a `Dengue` não estiver nele, ele **força** a presença dela e a **colore de verde** (junto com o respectivo texto numérico) para evidenciar a comparação de forma didática.
 ```bash
-./vacinas_cli.py --chart complications --severity severe --sort most_complications --start-year 2023 --end-year 2024 --top 5 --search Dengue -o ex_complicacoes_search_dengue.png
+./vacinas_cli.py --chart complications \
+    --severity severe --sort most_complications \
+    --start-year 2023 --end-year 2024 \
+    --top 5 --search Dengue -o ex_complicacoes_search_dengue.png
 ```
 ![Top 5 Forçando Destaque da Dengue](ex_complicacoes_search_dengue.png)
 
@@ -57,7 +68,9 @@ O programa extrai o Top natural, e se a `Dengue` não estiver nele, ele **força
 ### 5. Perfil Demográfico Profundo
 Descreve em riqueza de detalhes estatísticos o perfil do paciente que recebe a vacina pesquisada (Sexo, Raça/Cor e Faixa Etária).
 ```bash
-./vacinas_cli.py --chart profile --start-year 2023 --end-year 2024 --search Dengue -o ex_perfil_dengue.png
+./vacinas_cli.py --chart profile \
+    --start-year 2023 --end-year 2024 \
+    --search Dengue -o ex_perfil_dengue.png
 ```
 ![Perfil Dengue](ex_perfil_dengue.png)
 
