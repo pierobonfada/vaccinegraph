@@ -21,36 +21,43 @@ def resolve_city_name(city_arg):
     if city_arg.isdigit() and len(city_arg) == 6:
         return city_arg
         
-    eprint(f"Consultando IBGE para a cidade: {city_arg}...")
     import urllib.request
     import json
     import gzip
-    try:
-        req = urllib.request.Request('https://servicodados.ibge.gov.br/api/v1/localidades/municipios', headers={'Accept-Encoding': 'gzip'})
-        with urllib.request.urlopen(req) as response:
-            if response.info().get('Content-Encoding') == 'gzip':
-                data = json.loads(gzip.decompress(response.read()).decode('utf-8'))
-            else:
-                data = json.loads(response.read().decode('utf-8'))
-                
-        # Normalizar string (remover acentos) para busca
-        import unicodedata
-        def normalize(s):
-            return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
+    import os
+    
+    ibge_cache = os.path.join(DATA_DIR, "cidades_ibge.json")
+    if not os.path.exists(ibge_cache):
+        eprint(f"Baixando banco de dados estatico do IBGE pela primeira e unica vez...")
+        try:
+            req = urllib.request.Request('https://servicodados.ibge.gov.br/api/v1/localidades/municipios', headers={'Accept-Encoding': 'gzip'})
+            with urllib.request.urlopen(req) as response:
+                if response.info().get('Content-Encoding') == 'gzip':
+                    data = json.loads(gzip.decompress(response.read()).decode('utf-8'))
+                else:
+                    data = json.loads(response.read().decode('utf-8'))
+            with open(ibge_cache, 'w', encoding='utf-8') as cache_file:
+                json.dump(data, cache_file, ensure_ascii=False)
+        except Exception as e:
+            eprint(f"ERRO ao baixar banco do IBGE: {e}")
+            sys.exit(1)
             
-        search_norm = normalize(city_arg)
-        for m in data:
-            if normalize(m['nome']) == search_norm:
-                code = str(m['id'])[:6] # IBGE 6 digits
-                eprint(f" > Encontrado: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code}")
-                return code
-                
-        eprint(f"ERRO: Cidade '{city_arg}' nao encontrada no IBGE.")
-        sys.exit(1)
-    except Exception as e:
-        eprint(f"ERRO na consulta ao IBGE: {e}")
-        sys.exit(1)
-
+    with open(ibge_cache, 'r', encoding='utf-8') as cache_file:
+        data = json.load(cache_file)
+        
+    import unicodedata
+    def normalize(s):
+        return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
+        
+    search_norm = normalize(city_arg)
+    for m in data:
+        if normalize(m['nome']) == search_norm:
+            code_str = str(m['id'])[:6]
+            eprint(f" > Encontrado na base local: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code_str}")
+            return code_str
+            
+    eprint(f"ERRO: Cidade '{city_arg}' nao encontrada na base IBGE.")
+    sys.exit(1)
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -876,6 +883,9 @@ def main():
             if args.search:
                 search_terms = [s.lower() for s in args.search]
                 df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
+            if args.top and not args.search:
+                top_vaccines = df.groupby('vaccine')['total_doses'].sum().nlargest(args.top).index
+                df = df[df['vaccine'].isin(top_vaccines)]
         else:
             df = pd.DataFrame(columns=['vaccine', 'nu_mes', 'nu_ano', 'total_doses'])
             
@@ -896,6 +906,9 @@ def main():
             if args.search:
                 search_terms = [s.lower() for s in args.search]
                 df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
+            if args.top and not args.search:
+                top_vaccines = df.groupby('vaccine')['total_doses'].sum().nlargest(args.top).index
+                df = df[df['vaccine'].isin(top_vaccines)]
         else:
             df = pd.DataFrame(columns=['vaccine', 'co_sexo', 'co_racacor', 'age_group', 'total_doses'])
             
