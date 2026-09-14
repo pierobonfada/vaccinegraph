@@ -80,3 +80,5 @@ Descreve em riqueza de detalhes estatísticos o perfil do paciente que recebe a 
 - **Sanity Checks (Filtros de Perda de Dados):** Se a taxa de evento grave exceder 100% devido a perdas de registro de denominador no SIPNI (comum em reportes "Genéricos" no VigiMed), a vacina é excluída da plotagem e um alerta justificado metodologicamente é gerado no rodapé do gráfico.
 
 **Desenvolvido em Python | DuckDB | Pandas | Matplotlib**
+
+**Regras para propostas de commit: source e comentários: english only! Output para o usuário: portugues apenas!**
