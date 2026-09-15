@@ -471,9 +471,5 @@ def generate_dashboard_infographic(data, output_file=None):
                         ha='center', va='bottom', fontsize=9, fontweight='bold', color='#2c3e50')
 
     plt.tight_layout()
-    if output_file:
-        plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
-        print(f">> Dashboard completo salvo em: {output_file}")
-    else:
-        plt.show()
+    handle_output(fig, output_file)
     plt.close()
