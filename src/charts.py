@@ -418,7 +418,7 @@ def generate_dashboard_infographic(data, output_file=None):
     
     kpis = [
         ('Doses Aplicadas', f"{int(data['total_doses']):,}".replace(',','.')),
-        ('Pessoas Vacinadas', f"{int(data['total_people']):,}".replace(',','.')),
+        ('Pessoas Vacinadas (Cobertura)', f"{int(data['total_people']):,}".replace(',','.') if data['total_people'] > 0 else 'Não Tabelado'),
         ('Complicações Graves', f"{int(data['complications_severe']):,}".replace(',','.')),
         ('Óbitos Registrados', f"{int(data['complications_death']):,}".replace(',','.'))
     ]
