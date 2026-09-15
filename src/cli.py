@@ -324,8 +324,8 @@ def main():
             eprint("Nenhuma vacina encontrada nas bases do SIPNI com esse termo.")
             sys.exit(1)
             
-        # Pega o primeiro nome exato que deu match
-        vaccine_name = df_doses.iloc[0]['vaccine']
+        matched_vaccines = df_doses['vaccine'].tolist()
+        vaccine_name = f"Grupo: {vaccine_search.title()}" if len(matched_vaccines) > 1 else matched_vaccines[0]
             
         # 2. VigiMed
         df_v_raw = pd.read_csv('data/raw/VigiMed_Notificacoes.csv', sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
@@ -338,9 +338,9 @@ def main():
         df_v_raw = df_v_raw[(df_v_raw['ano_noti'] >= start) & (df_v_raw['ano_noti'] <= end)]
         df_v_raw['vaccine_std'] = df_v_raw['NOME_MEDICAMENTO_WHODRUG'].apply(padroniza_nome_vacina)
         
-        df_v_filtered = df_v_raw[df_v_raw['vaccine_std'] == vaccine_name]
+        df_v_filtered = df_v_raw[df_v_raw['vaccine_std'].isin(matched_vaccines)]
         
-        total_doses = df_doses.iloc[0]['total_doses']
+        total_doses = df_doses['total_doses'].sum()
         
         def expand_reactions(df_subset):
             if df_subset.empty: return {}
@@ -394,24 +394,25 @@ def main():
             eprint("Nenhuma vacina encontrada nas bases do SIPNI com esse termo.")
             sys.exit(1)
             
-        vaccine_name = df_d.iloc[0]['vaccine']
-        total_doses = df_d.iloc[0]['total_doses']
+        matched_vaccines = df_d['vaccine'].tolist()
+        vaccine_name = f"Grupo: {vaccine_search.title()}" if len(matched_vaccines) > 1 else matched_vaccines[0]
+        total_doses = df_d['total_doses'].sum()
         
         # --- PEOPLE ---
         df_pe = get_total_for_mode('people')
         total_people = 0
         if not df_pe.empty:
             df_pe = df_pe.groupby('vaccine')['total_doses'].sum().reset_index()
-            pe_match = df_pe[df_pe['vaccine'] == vaccine_name]
+            pe_match = df_pe[df_pe['vaccine'].isin(matched_vaccines)]
             if not pe_match.empty:
-                total_people = pe_match.iloc[0]['total_doses']
+                total_people = pe_match['total_doses'].sum()
                 
         # --- YEARLY ---
         df_y_all = []
         for y in range(start, end + 1):
             dy = update_modern_data(y, False, states=args.state, cities=args.city, mode='doses')
             if not dy.empty:
-                dy = dy[dy['vaccine'] == vaccine_name]
+                dy = dy[dy['vaccine'].isin(matched_vaccines)]
                 if not dy.empty:
                     val = dy['total_doses'].sum()
                     df_y_all.append({'ano': y, 'total_doses': val})
@@ -423,7 +424,7 @@ def main():
         df_m = get_total_for_mode('monthly')
         df_monthly = pd.DataFrame()
         if not df_m.empty:
-            df_m = df_m[df_m['vaccine'] == vaccine_name]
+            df_m = df_m[df_m['vaccine'].isin(matched_vaccines)]
             df_monthly = df_m.groupby('nu_mes')['total_doses'].mean().reset_index()
             # Ensure all months exist
             months = pd.DataFrame({'nu_mes': range(1, 13)})
@@ -433,7 +434,7 @@ def main():
         df_pr = get_total_for_mode('profile')
         df_profile = pd.DataFrame()
         if not df_pr.empty:
-            df_pr = df_pr[df_pr['vaccine'] == vaccine_name]
+            df_pr = df_pr[df_pr['vaccine'].isin(matched_vaccines)]
             # Custom sorting for age groups
             age_order = ['0-4 anos', '5-11 anos', '12-19 anos', '20-39 anos', '40-59 anos', '60+ anos', 'Sem Informação']
             df_profile = df_pr.groupby('age_group')['total_doses'].sum().reset_index()
@@ -448,7 +449,7 @@ def main():
         df_v_raw['ano_noti'] = df_v_raw['DATA_INCLUSAO_SISTEMA'].str.extract(r'(\d{4})').astype(float)
         df_v_raw = df_v_raw[(df_v_raw['ano_noti'] >= start) & (df_v_raw['ano_noti'] <= end)]
         df_v_raw['vaccine_std'] = df_v_raw['NOME_MEDICAMENTO_WHODRUG'].apply(padroniza_nome_vacina)
-        df_v_filtered = df_v_raw[df_v_raw['vaccine_std'] == vaccine_name]
+        df_v_filtered = df_v_raw[df_v_raw['vaccine_std'].isin(matched_vaccines)]
         
         is_death = df_v_filtered['DESFECHO'].str.contains('óbito|fatal', case=False, na=False) | df_v_filtered['GRAVIDADE'].str.contains('óbito|fatal', case=False, na=False)
         is_severe = (df_v_filtered['GRAVE'] == 'Sim') | is_death
