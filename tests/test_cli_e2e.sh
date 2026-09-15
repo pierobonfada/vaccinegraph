@@ -35,3 +35,11 @@ echo "Testing combinations (monthly + search + state)..."
 ./vaccinegraph --chart monthly --search HPV --state RS -o test_output/monthly_rs.png || { echo "ERROR: monthly combination"; exit 1; }
 
 echo "All tests passed successfully!"
+
+echo "Testing list-vaccines..."
+./vaccinegraph --list-vaccines > /dev/null || { echo "ERROR: list-vaccines"; exit 1; }
+
+echo "Testing invalid arguments..."
+./vaccinegraph --clean 2>/dev/null && { echo "ERROR: invalid argument was accepted"; exit 1; }
+
+echo "Basic tests passed successfully!"

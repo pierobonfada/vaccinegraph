@@ -1,10 +1,11 @@
+import datetime
+import shutil
 import pandas as pd
 import argparse
 import sys
 import os
-import datetime
 from src.utils import eprint
-from src.downloader import global_update, RAW_DATA_DIR, OUTPUT_DIR
+from src.downloader import global_update, RAW_DATA_DIR, OUTPUT_DIR, DATA_DIR
 from src.data import resolve_city_name, padroniza_nome_vacina, update_modern_data, apply_filters_and_highlights, get_vigimed_data
 from src.charts import (generate_infographic, generate_doses_chart, generate_people_chart,
                         generate_timeline_chart, generate_total_yearly_chart,
@@ -38,7 +39,6 @@ def main():
                              " - infographic: Infográfico completo de complicações para UMA vacina específica (use --search)")
                              
     parser.add_argument('--start-year', type=int, default=2023, help="Ano inicial da análise (Mínimo: 2023).")
-    import datetime
     current_year = datetime.date.today().year
     parser.add_argument('--end-year', type=int, default=current_year, help="Ano final da análise (padrão: ano atual).")
     parser.add_argument('--state', type=str, nargs='+', help="Filtrar por Sigla(s) do Estado (Ex: RS SP).")
@@ -125,7 +125,6 @@ def main():
 
     if args.clear_cache:
         eprint(">> Limpando o cache e deletando gigabytes de dados...")
-        import shutil
         if os.path.exists(DATA_DIR): shutil.rmtree(DATA_DIR)
         eprint(">> Cache limpo com sucesso!")
         return
