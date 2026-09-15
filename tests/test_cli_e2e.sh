@@ -31,7 +31,7 @@ echo "Testing complications..."
 ./vaccinegraph --chart complications -o test_output/complications.png || { echo "ERROR: complications"; exit 1; }
 
 echo "Testing infographic..."
-./vaccinegraph --chart infographic --search HPV -o test_output/infographic.png || { echo "ERROR: infographic"; exit 1; }
+./vaccinegraph --chart symptoms --only HPV -o test_output/infographic.png || { echo "ERROR: infographic"; exit 1; }
 
 echo "Testing combinations (monthly + search + state)..."
 ./vaccinegraph --chart monthly --search HPV --state RS -o test_output/monthly_rs.png || { echo "ERROR: monthly combination"; exit 1; }

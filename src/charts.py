@@ -38,7 +38,7 @@ def handle_output(fig, output_file):
         fig.savefig(out_path, dpi=300, bbox_inches='tight')
         eprint(f">> Grafico salvo em: {out_path}")
 
-def generate_infographic(res, total_doses, output_file=None):
+def generate_symptoms_chart(res, total_doses, output_file=None):
     if not res:
         eprint("Nenhuma notificacao encontrada para esta vacina.")
         sys.exit(1)
@@ -400,3 +400,80 @@ def generate_risk_chart(df, title, output_file=None, anomaly_msg=None):
         plt.tight_layout(rect=[0, 0.02, 1, 0.95])
         
     handle_output(fig, output_file)
+
+
+def generate_dashboard_infographic(data, output_file=None):
+    vaccine = data['vaccine_name']
+    
+    fig = plt.figure(figsize=(15, 12))
+    fig.patch.set_facecolor('#f8f9fa')
+    
+    # Define grid: 3 rows, 2 columns
+    gs = fig.add_gridspec(3, 2, height_ratios=[1, 1.5, 1.5], hspace=0.4, wspace=0.3)
+    
+    # --- ROW 1: KPIs ---
+    ax_kpi = fig.add_subplot(gs[0, :])
+    ax_kpi.axis('off')
+    ax_kpi.set_title(f'Dashboard Epidemiológico: {vaccine}', fontsize=22, fontweight='black', color='#2c3e50', pad=20)
+    
+    kpis = [
+        ('Doses Aplicadas', f"{int(data['total_doses']):,}".replace(',','.')),
+        ('Pessoas Vacinadas', f"{int(data['total_people']):,}".replace(',','.')),
+        ('Complicações Graves', f"{int(data['complications_severe']):,}".replace(',','.')),
+        ('Óbitos Registrados', f"{int(data['complications_death']):,}".replace(',','.'))
+    ]
+    
+    for i, (label, val) in enumerate(kpis):
+        x = 0.125 + (i * 0.25)
+        ax_kpi.text(x, 0.6, val, fontsize=28, fontweight='black', color='#e74c3c' if i>=2 else '#2980b9', ha='center', va='center')
+        ax_kpi.text(x, 0.2, label, fontsize=12, fontweight='bold', color='#7f8c8d', ha='center', va='center')
+        
+    if data['total_doses'] > 0:
+        risk = (data['complications_severe'] / data['total_doses']) * 100
+        ax_kpi.text(0.5, -0.2, f"Risco Relativo (Graves/Dose): {risk:.6f}%", fontsize=14, fontweight='bold', color='#c0392b', ha='center', va='center')
+
+    # --- ROW 2 COL 1: Anual ---
+    ax_ano = fig.add_subplot(gs[1, 0])
+    df_y = data['df_yearly']
+    if not df_y.empty:
+        bars_y = ax_ano.bar(df_y['ano'].astype(str), df_y['total_doses'], color='#3498db')
+        ax_ano.set_title('Doses Aplicadas por Ano', fontsize=14, fontweight='bold', color='#34495e')
+        ax_ano.spines['top'].set_visible(False)
+        ax_ano.spines['right'].set_visible(False)
+        ax_ano.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x/1000)}k" if x>=1000 else str(int(x))))
+        for b in bars_y:
+            ax_ano.text(b.get_x() + b.get_width()/2, b.get_height(), f"{int(b.get_height()):,}".replace(',','.'), 
+                        ha='center', va='bottom', fontsize=9, fontweight='bold', color='#2c3e50')
+                        
+    # --- ROW 2 COL 2: Mensal ---
+    ax_mes = fig.add_subplot(gs[1, 1])
+    df_m = data['df_monthly']
+    if not df_m.empty:
+        ax_mes.plot(df_m['nu_mes'], df_m['total_doses'], marker='o', color='#2ecc71', linewidth=3, markersize=8)
+        ax_mes.set_title('Sazonalidade Mensal (Consolidado)', fontsize=14, fontweight='bold', color='#34495e')
+        ax_mes.set_xticks(range(1, 13))
+        ax_mes.set_xticklabels(['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'])
+        ax_mes.spines['top'].set_visible(False)
+        ax_mes.spines['right'].set_visible(False)
+        ax_mes.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x/1000)}k" if x>=1000 else str(int(x))))
+
+    # --- ROW 3: Perfil Demográfico ---
+    ax_prof = fig.add_subplot(gs[2, :])
+    df_p = data['df_profile']
+    if not df_p.empty:
+        bars_p = ax_prof.bar(df_p['age_group'], df_p['total_doses'], color='#9b59b6')
+        ax_prof.set_title('Perfil Demográfico (Idades)', fontsize=14, fontweight='bold', color='#34495e')
+        ax_prof.spines['top'].set_visible(False)
+        ax_prof.spines['right'].set_visible(False)
+        ax_prof.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f"{int(x/1000)}k" if x>=1000 else str(int(x))))
+        for b in bars_p:
+            ax_prof.text(b.get_x() + b.get_width()/2, b.get_height(), f"{int(b.get_height()):,}".replace(',','.'), 
+                        ha='center', va='bottom', fontsize=9, fontweight='bold', color='#2c3e50')
+
+    plt.tight_layout()
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+        print(f">> Dashboard completo salvo em: {output_file}")
+    else:
+        plt.show()
+    plt.close()
