@@ -73,7 +73,7 @@ def padroniza_nome_vacina(nome):
     if 'HEPATITE B' in nome: return 'Hepatite B'
     if 'HEPATITE A' in nome: return 'Hepatite A'
     if 'FEBRE AMARELA' in nome: return 'Febre Amarela'
-    if 'RAIVA' in nome: return 'Raiva'
+    if 'RAIVA' in nome: return 'Vacina Raiva'
     if 'VARICELA' in nome: return 'Varicela'
     if 'PENTA' in nome: return 'Pentavalente (DTP-HB-Hib)'
     if 'TRÍPLICE VIRAL' in nome or 'SARAMPO' in nome: return 'Tríplice Viral (SCR)'

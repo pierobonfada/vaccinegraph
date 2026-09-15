@@ -409,7 +409,7 @@ def main():
         # --- YEARLY ---
         df_y_all = []
         for y in range(start, end + 1):
-            dy = update_modern_data(y, False, states=args.state, cities=args.city, mode='total_yearly')
+            dy = update_modern_data(y, False, states=args.state, cities=args.city, mode='doses')
             if not dy.empty:
                 dy = dy[dy['vaccine'] == vaccine_name]
                 if not dy.empty:
