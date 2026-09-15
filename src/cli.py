@@ -257,7 +257,15 @@ def main():
         # Calculate percentage
         df_merged['pct_complications'] = (df_merged['total_complications'] / df_merged['total_doses']) * 100
         
-        # Filtro de anomalia (mais de 100%% de compl.cacao ou agrupamentos genericos quebrados)
+        sort_col_map = {
+            'most_complications': 'pct_complications',
+            'least_complications': 'pct_complications',
+            'most_doses': 'total_doses'
+        }
+        sort_col = sort_col_map.get(args.sort, 'pct_complications')
+        ascending = True if args.sort == 'least_complications' else False
+        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, until_terms=args.until, ascending=ascending)
+# Filtro de anomalia (mais de 100%% de compl.cacao ou agrupamentos genericos quebrados)
         # Agrupamentos como 'Outras/Genérica' acumulam muitas notificacoes vagas do VigiMed 
         # para pouquissimas doses genericas no SIPNI, gerando falsas taxas altissimas.
         mask_anomalies = (df_merged['pct_complications'] > 100) | (df_merged['vaccine'].str.contains('Genérica|Ignorada|Outras', case=False, na=False))
@@ -275,14 +283,7 @@ def main():
         if anomaly_texts:
             anomaly_msg = "OBSERVAÇÃO: " + ", ".join(anomaly_texts) + " indicam perda de dados no SIPNI (taxa > 100%) e foram ocultadas."
 
-        sort_col_map = {
-            'most_complications': 'pct_complications',
-            'least_complications': 'pct_complications',
-            'most_doses': 'total_doses'
-        }
-        sort_col = sort_col_map.get(args.sort, 'pct_complications')
-        ascending = True if args.sort == 'least_complications' else False
-        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, until_terms=args.until, ascending=ascending)
+        
         if df_merged.empty:
             eprint("Erro: A filtragem resultou em um grafico vazio. Tente ajustar os parametros (ex: --only).")
             sys.exit(1)

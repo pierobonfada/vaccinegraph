@@ -36,6 +36,18 @@ def padroniza_nome_vacina(nome):
             return 'COVID-19 (AstraZeneca)' 
         return 'COVID-19 (Outras/Genérica)'
         
+    
+    if 'SORO' in nome:
+        if 'RABICO' in nome or 'RÁBICO' in nome: return 'Soro Antirrábico'
+        if 'TETANICO' in nome or 'TETÂNICO' in nome: return 'Soro Antitetânico'
+        if 'BOTROPICO' in nome or 'BOTRÓPICO' in nome: return 'Soro Antibotrópico'
+        if 'CROTALICO' in nome or 'CROTÁLICO' in nome: return 'Soro Anticrotálico'
+        if 'ESCORPIONICO' in nome or 'ESCORPIÔNICO' in nome: return 'Soro Antiescorpiônico'
+        if 'ARACNIDICO' in nome or 'ARACNÍDICO' in nome: return 'Soro Antiaracnídico (Loxosceles, Phoneutria, Tityus)'
+        if 'ELAPIDICO' in nome or 'ELAPÍDICO' in nome: return 'Soro Antielapídico'
+        if 'BOTULINICO' in nome or 'BOTULÍNICO' in nome: return 'Soro Antibotulínico'
+        return 'Soro (Outros)'
+
     if 'DENGUE' in nome or 'QDENGA' in nome or 'DENGVAXIA' in nome:
         if 'QDENGA' in nome:
             return 'Dengue (Qdenga/Atenuada)'
