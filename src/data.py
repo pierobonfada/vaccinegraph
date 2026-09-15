@@ -7,21 +7,27 @@ from src.utils import logger, padroniza_nome_vacina, eprint
 from src.downloader import DATA_DIR, RAW_DATA_DIR, check_file_age, download_file
 
 def resolve_city_name(city_arg):
-    if city_arg.isdigit() and len(city_arg) == 6:
-        return city_arg
-        
     import json
     import os
+    import sys
+    import unicodedata
     
     ibge_cache = os.path.join(DATA_DIR, "cidades_ibge.json")
     if not os.path.exists(ibge_cache):
+        if city_arg.isdigit() and len(city_arg) == 6:
+            return city_arg, f"IBGE:{city_arg}"
         eprint("ERRO: Banco de dados de cidades (IBGE) nao encontrado. Execute com '--update' para baixar as bases.")
         sys.exit(1)
             
     with open(ibge_cache, 'r', encoding='utf-8') as cache_file:
         data = json.load(cache_file)
         
-    import unicodedata
+    if city_arg.isdigit() and len(city_arg) == 6:
+        for m in data:
+            if str(m['id'])[:6] == city_arg:
+                return city_arg, f"{m['nome']}-{m['microrregiao']['mesorregiao']['UF']['sigla']}"
+        return city_arg, f"IBGE:{city_arg}"
+        
     def normalize(s):
         return ''.join(c for c in unicodedata.normalize('NFD', s.lower()) if unicodedata.category(c) != 'Mn')
         
@@ -29,8 +35,9 @@ def resolve_city_name(city_arg):
     for m in data:
         if normalize(m['nome']) == search_norm:
             code_str = str(m['id'])[:6]
-            eprint(f" > Cidade resolvida localmente: {m['nome']} ({m['microrregiao']['mesorregiao']['UF']['sigla']}) -> {code_str}")
-            return code_str
+            city_display = f"{m['nome']}-{m['microrregiao']['mesorregiao']['UF']['sigla']}"
+            eprint(f" > Cidade resolvida: {city_display} -> {code_str}")
+            return code_str, city_display
             
     eprint(f"ERRO: Cidade '{city_arg}' nao encontrada na base IBGE.")
     sys.exit(1)

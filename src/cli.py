@@ -77,8 +77,11 @@ def main():
     if args.chart == 'infographic' and (not args.search or len(args.search) > 1):
         parser.error("O grafico 'infographic' requer exatamente UMA vacina definida em --search. Para comparar varias, use --chart complications.")
         
+    city_names = []
     if args.city:
-        args.city = [resolve_city_name(c) for c in args.city]
+        resolved = [resolve_city_name(c) for c in args.city]
+        args.city = [r[0] for r in resolved]
+        city_names = [r[1] for r in resolved]
         
     if not args.update and (args.search or args.until):
         import duckdb
@@ -170,7 +173,7 @@ def main():
         
         title = "Total Absoluto de Vacinas Aplicadas por Ano"
         if args.state: title += f" ({' '.join(args.state)})"
-        if args.city: title += f" (Municípios: {','.join(args.city)})"
+        if city_names: title += f" ({', '.join(city_names)})"
         generate_total_yearly_chart(yearly_data, output_file=args.output, title=title)
         
     elif args.chart == 'monthly':
@@ -196,7 +199,7 @@ def main():
         title = f"Série Temporal de Vacinação (Mês a Mês)"
         if args.search: title += f"\n[{', '.join(args.search)}]"
         if args.state: title += f" ({' '.join(args.state)})"
-        if args.city: title += f" (Mun: {','.join(args.city)})"
+        if city_names: title += f" ({', '.join(city_names)})"
         
         generate_monthly_chart(df, title, output_file=args.output)
     elif args.chart == 'profile':
@@ -222,7 +225,7 @@ def main():
         title = f"Perfil Demográfico da População Vacinada"
         if args.search: title += f"\n[{', '.join(args.search)}]"
         if args.state: title += f" ({' '.join(args.state)})"
-        if args.city: title += f" (Mun: {','.join(args.city)})"
+        if city_names: title += f" ({', '.join(city_names)})"
         
         generate_profile_chart(df, title, output_file=args.output)
     elif args.chart == 'complications':
