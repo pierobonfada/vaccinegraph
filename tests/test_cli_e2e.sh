@@ -26,6 +26,8 @@ echo "Testing profile..."
 ./vaccinegraph --chart profile -o test_output/profile.png || { echo "ERROR: profile"; exit 1; }
 
 echo "Testing complications..."
+./vaccinegraph --chart risk -o test_output/risk.png || { echo "ERROR: risk"; exit 1; }
+
 ./vaccinegraph --chart complications -o test_output/complications.png || { echo "ERROR: complications"; exit 1; }
 
 echo "Testing infographic..."

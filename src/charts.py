@@ -140,8 +140,8 @@ def generate_infographic(res, total_doses, output_file=None):
     plt.tight_layout(rect=[0, 0.06, 1, 0.88])
     handle_output(fig, output_file)
 
-def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None):
-    df_doses = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n)
+def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None):
+    df_doses = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n, exclude_terms=exclude_terms)
     
     fig, ax1 = plt.subplots(figsize=(10, 8))
     ax1.bar(df_doses['vaccine'], df_doses['total_doses'], color=df_doses['color'])
@@ -152,7 +152,7 @@ def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=No
     annotate_bars(ax1)
     handle_output(fig, output_file)
 
-def generate_people_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None):
+def generate_people_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None):
     df_people = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n)
     
     fig, ax2 = plt.subplots(figsize=(10, 8))

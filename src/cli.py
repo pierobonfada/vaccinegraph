@@ -308,9 +308,9 @@ def main():
                 all_dfs.append(df_y)
         if all_dfs:
             df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
-        if args.exclude:
-            exclude_terms = [e.lower() for e in args.exclude]
-            df_doses = df_doses[~df_doses['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
+            if args.exclude:
+                exclude_terms = [e.lower() for e in args.exclude]
+                df_doses = df_doses[~df_doses['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
         else:
             eprint("Sem dados de doses para o periodo.")
             sys.exit(1)
