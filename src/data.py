@@ -146,7 +146,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
         
         return pd.read_parquet(DATABASE_FILE)
 
-def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None, until_terms=None, ascending=False, exclude_terms=None):
+def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None, until_terms=None, ascending=False, exclude_terms=None, only_terms=None):
     import pandas as pd
     import numpy as np
     stats_df = stats_df.copy()
@@ -155,6 +155,11 @@ def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=No
         exclude_terms = [e.lower() for e in exclude_terms]
         stats_df = stats_df[~stats_df['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
 
+    
+    if only_terms:
+        only_terms = [o.lower() for o in only_terms]
+        stats_df = stats_df[stats_df['vaccine'].str.lower().apply(lambda x: any(o in x for o in only_terms))]
+        
     stats_df = stats_df.sort_values(by=sort_col, ascending=ascending).reset_index(drop=True)
     
     if until_terms:
