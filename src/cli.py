@@ -48,6 +48,7 @@ def main():
     parser.add_argument('--bottom', type=int, help="Exibe as N vacinas na base do ranking.")
     
     parser.add_argument('--search', type=str, nargs='+', help="Busca vacinas específicas por nome (Ex: HPV Influenza). Em infographic, define o alvo principal.")
+    parser.add_argument('--exclude', type=str, nargs='+', help="Remove vacinas específicas do gráfico (Ex: Influenza COVID).")
     parser.add_argument('--until', type=str, nargs='+', help="Busca dinâmica: lista o ranking progressivamente até encontrar a vacina desejada.")
     
     parser.add_argument('--severity', type=str, choices=['simple', 'severe', 'death', 'all'], default='severe', help="Filtra a gravidade das complicações no VigiMed (padrão: severe).")
@@ -144,13 +145,13 @@ def main():
         for y in range(start, end + 1):
             df_doses = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='doses')
             if args.search:
-                df_doses = apply_filters_and_highlights(df_doses, 'total_doses', search_terms=args.search)
+                df_doses = apply_filters_and_highlights(df_doses, 'total_doses', search_terms=args.search, exclude_terms=args.exclude)
                 df_doses = df_doses[df_doses['is_searched']]
             total_doses = df_doses['total_doses'].sum() if not df_doses.empty else 0
             
             df_cob = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='cobertura')
             if args.search:
-                df_cob = apply_filters_and_highlights(df_cob, 'total_doses', search_terms=args.search)
+                df_cob = apply_filters_and_highlights(df_cob, 'total_doses', search_terms=args.search, exclude_terms=args.exclude)
                 df_cob = df_cob[df_cob['is_searched']]
             total_schemas = df_cob['total_doses'].sum() if not df_cob.empty else 0
             
@@ -163,7 +164,7 @@ def main():
         for y in range(start, end + 1):
             df_doses = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='doses')
             if args.search:
-                df_doses = apply_filters_and_highlights(df_doses, 'total_doses', search_terms=args.search)
+                df_doses = apply_filters_and_highlights(df_doses, 'total_doses', search_terms=args.search, exclude_terms=args.exclude)
                 df_doses = df_doses[df_doses['is_searched']]
             yearly_data[y] = df_doses['total_doses'].sum() if not df_doses.empty else 0
         
@@ -180,6 +181,9 @@ def main():
                 all_dfs.append(df_y)
         if all_dfs:
             df = pd.concat(all_dfs)
+            if args.exclude:
+                exclude_terms = [e.lower() for e in args.exclude]
+                df = df[~df['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
             if args.search:
                 search_terms = [s.lower() for s in args.search]
                 df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
@@ -203,6 +207,9 @@ def main():
                 all_dfs.append(df_y)
         if all_dfs:
             df = pd.concat(all_dfs)
+            if args.exclude:
+                exclude_terms = [e.lower() for e in args.exclude]
+                df = df[~df['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
             if args.search:
                 search_terms = [s.lower() for s in args.search]
                 df = df[df['vaccine'].str.lower().apply(lambda x: any(s in x for s in search_terms))]
@@ -230,6 +237,9 @@ def main():
             sys.exit(1)
             
         df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
+        if args.exclude:
+            exclude_terms = [e.lower() for e in args.exclude]
+            df_doses = df_doses[~df_doses['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
         
         # Merge with VigiMed
         df_vigimed = get_vigimed_data(args.severity, states=args.state, start_year=start, end_year=end)
@@ -264,7 +274,7 @@ def main():
         }
         sort_col = sort_col_map.get(args.sort, 'pct_complications')
         ascending = True if args.sort == 'least_complications' else False
-        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, until_terms=args.until, ascending=ascending)
+        df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, until_terms=args.until, ascending=ascending)
         state_str = f" (UF: {' '.join(args.state)})" if args.state else " (Brasil)"
         title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
         title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
@@ -285,6 +295,9 @@ def main():
                 all_dfs.append(df_y)
         if all_dfs:
             df_doses = pd.concat(all_dfs).groupby('vaccine')['total_doses'].sum().reset_index()
+        if args.exclude:
+            exclude_terms = [e.lower() for e in args.exclude]
+            df_doses = df_doses[~df_doses['vaccine'].str.lower().apply(lambda x: any(e in x for e in exclude_terms))]
         else:
             eprint("Sem dados de doses para o periodo.")
             sys.exit(1)
@@ -361,9 +374,9 @@ def main():
         label_year += state_label + city_label
         
         if args.chart == 'doses':
-            generate_doses_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, output_file=args.output)
+            generate_doses_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, output_file=args.output)
         elif args.chart == 'people':
-            generate_people_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, output_file=args.output)
+            generate_people_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, output_file=args.output)
 
 if __name__ == '__main__':
     main()
