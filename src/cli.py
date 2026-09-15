@@ -256,9 +256,12 @@ def main():
         # Calculate percentage
         df_merged['pct_complications'] = (df_merged['total_complications'] / df_merged['total_doses']) * 100
         
-        # Filtro de anomalia (mais de 100% de complicacao)
-        anomalies = df_merged[df_merged['pct_complications'] > 100]
-        df_merged = df_merged[df_merged['pct_complications'] <= 100].reset_index(drop=True)
+        # Filtro de anomalia (mais de 100% de complicacao ou agrupamentos genericos quebrados)
+        # Agrupamentos como 'Outras/Genérica' acumulam muitas notificacoes vagas do VigiMed 
+        # para pouquissimas doses genericas no SIPNI, gerando falsas taxas altissimas.
+        mask_anomalies = (df_merged['pct_complications'] > 100) | (df_merged['vaccine'].str.contains('Genérica|Ignorada|Outras', case=False, na=False))
+        anomalies = df_merged[mask_anomalies]
+        df_merged = df_merged[~mask_anomalies].reset_index(drop=True)
         
         anomaly_texts = []
         for _, row in anomalies.iterrows():
