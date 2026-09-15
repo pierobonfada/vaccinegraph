@@ -53,7 +53,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
     filename = "Doses_Residencia.parquet" if mode in ['doses', 'monthly', 'profile'] else "Cobertura_Residencia.parquet"
     DATABASE_FILE = os.path.join(DATA_DIR, f"vaccination_aggregate_{year}_{mode}{suffix}.parquet")
     
-    eprint(f"\n[Fase 1] Verificacao de Dados Reais do SI-PNI (SIPNIBD - {year}) - Modo: {mode}")
+    
     url = f"ftp://ftp.datasus.gov.br/dissemin/publicos/Dados_Abertos/SIPNIBD/{filename}"
     dest_path = os.path.join(RAW_DATA_DIR, filename)
     
@@ -143,7 +143,7 @@ def update_modern_data(year, force_update, states=None, mode='doses', cities=Non
         df.to_parquet(DATABASE_FILE, index=False)
         return df
     else:
-        eprint(">> Base cacheada ja existe.")
+        
         return pd.read_parquet(DATABASE_FILE)
 
 def apply_filters_and_highlights(stats_df, sort_col, search_terms=None, top_n=None, bottom_n=None, until_terms=None, ascending=False, exclude_terms=None):
@@ -211,7 +211,7 @@ def get_vigimed_data(severity, states=None, start_year=None, end_year=None):
     elif severity == 'death':
         severity_filter = "AND (LOWER(DESFECHO) LIKE '%óbito%' OR LOWER(DESFECHO) LIKE '%obito%' OR LOWER(DESFECHO) LIKE '%fatal%')"
         
-    eprint(f">> Processando Notificacoes VigiMed via Pandas (Filtro: {severity})")
+    eprint(f">> Processando Notificacoes VigiMed (Filtro: {severity})...")
     try:
         df_raw = pd.read_csv(vigimed_path, sep=';', encoding='ISO-8859-1', on_bad_lines='skip', low_memory=False)
     except Exception as e:
