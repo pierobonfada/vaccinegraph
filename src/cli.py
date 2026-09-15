@@ -424,7 +424,7 @@ def main():
         df_monthly = pd.DataFrame()
         if not df_m.empty:
             df_m = df_m[df_m['vaccine'] == vaccine_name]
-            df_monthly = df_m.groupby('nu_mes')['total_doses'].sum().reset_index()
+            df_monthly = df_m.groupby('nu_mes')['total_doses'].mean().reset_index()
             # Ensure all months exist
             months = pd.DataFrame({'nu_mes': range(1, 13)})
             df_monthly = pd.merge(months, df_monthly, on='nu_mes', how='left').fillna(0)
@@ -435,7 +435,7 @@ def main():
         if not df_pr.empty:
             df_pr = df_pr[df_pr['vaccine'] == vaccine_name]
             # Custom sorting for age groups
-            age_order = ['0-4 anos', '5-11 anos', '12-17 anos', '18-29 anos', '30-39 anos', '40-49 anos', '50-59 anos', '60-69 anos', '70-79 anos', '80+ anos']
+            age_order = ['0-4 anos', '5-11 anos', '12-19 anos', '20-39 anos', '40-59 anos', '60+ anos', 'Sem Informação']
             df_profile = df_pr.groupby('age_group')['total_doses'].sum().reset_index()
             df_profile['age_group'] = pd.Categorical(df_profile['age_group'], categories=age_order, ordered=True)
             df_profile = df_profile.sort_values('age_group').dropna()

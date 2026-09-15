@@ -450,7 +450,7 @@ def generate_dashboard_infographic(data, output_file=None):
     df_m = data['df_monthly']
     if not df_m.empty:
         ax_mes.plot(df_m['nu_mes'], df_m['total_doses'], marker='o', color='#2ecc71', linewidth=3, markersize=8)
-        ax_mes.set_title('Sazonalidade Mensal (Consolidado)', fontsize=14, fontweight='bold', color='#34495e')
+        ax_mes.set_title('Sazonalidade Mensal (Média)', fontsize=14, fontweight='bold', color='#34495e')
         ax_mes.set_xticks(range(1, 13))
         ax_mes.set_xticklabels(['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'])
         ax_mes.spines['top'].set_visible(False)
