@@ -321,7 +321,15 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
         
         color_text = '#27ae60' if df.get('is_searched', __import__('pandas').Series([False]*len(df))).iloc[i] else '#7f8c8d'
         color_text = '#27ae60' if df.get('is_searched', pd.Series([False]*len(df))).iloc[i] else '#7f8c8d'
-        ax.annotate(f'{dose_str}\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color=color_text, xytext=(0, 3), textcoords='offset points')
+        import math
+        offset_doses = 3
+        if comp > 0 and dose > 0:
+            # If the log distance is too small, they will overlap.
+            # We push the 'Doses' text higher by 45 points to clear the 3 lines of 'Casos' text.
+            if math.log10(dose) - math.log10(comp) < 1.2:
+                offset_doses = 45
+                
+        ax.annotate(f'{dose_str}\nDoses', (i, dose), ha='center', va='bottom', fontsize=9, color=color_text, xytext=(0, offset_doses), textcoords='offset points')
         ax.annotate(f'{comp_str}\nCasos\n({pct:.4f}%)', (i, comp), ha='center', va='bottom', fontsize=10, fontweight='bold', color='#c0392b', xytext=(0, 3), textcoords='offset points')
         
     ylim = ax.get_ylim()
