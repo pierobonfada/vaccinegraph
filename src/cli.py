@@ -485,9 +485,9 @@ def main():
         state_label = f" ({' '.join(args.state)})" if args.state else ""
         
         if args.chart == 'doses':
-            generate_doses_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, output_file=args.output)
+            generate_doses_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, until_terms=args.until, output_file=args.output)
         elif args.chart == 'people':
-            generate_people_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, output_file=args.output)
+            generate_people_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, until_terms=args.until, output_file=args.output)
 
     else:
         eprint(f"ERRO: Grafico '{args.chart}' nao implementado ou argumento invalido.")

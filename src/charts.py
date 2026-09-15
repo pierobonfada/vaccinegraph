@@ -140,8 +140,8 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
     plt.tight_layout(rect=[0, 0.06, 1, 0.88])
     handle_output(fig, output_file)
 
-def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None):
-    df_doses = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n, exclude_terms=exclude_terms, only_terms=only_terms)
+def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None, until_terms=None):
+    df_doses = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n, exclude_terms=exclude_terms, only_terms=only_terms, until_terms=until_terms)
     if df_doses.empty:
         print("Erro: A filtragem resultou em um grafico vazio.", file=sys.stderr)
         sys.exit(1)
@@ -155,7 +155,7 @@ def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=No
     annotate_bars(ax1)
     handle_output(fig, output_file)
 
-def generate_people_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None):
+def generate_people_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None, until_terms=None):
     df_people = apply_filters_and_highlights(df, sort_col='total_doses', search_terms=search_terms, top_n=top_n, bottom_n=bottom_n)
     
     fig, ax2 = plt.subplots(figsize=(10, 8))
