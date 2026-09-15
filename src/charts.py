@@ -371,15 +371,24 @@ def generate_risk_chart(df, title, output_file=None, anomaly_msg=None):
     ax.spines['right'].set_visible(False)
     
     # Add text labels on the bars
+    xlim_max = ax.get_xlim()[1]
     for bar, pct, dose, comp in zip(bars, df['pct_complications'], df['total_doses'], df['total_complications']):
-        ax.text(bar.get_width() + (ax.get_xlim()[1]*0.01), bar.get_y() + bar.get_height()/2,
+        # Percentage next to the bar
+        ax.text(bar.get_width() + (xlim_max*0.01), bar.get_y() + bar.get_height()/2,
                 f'{pct:.4f}%',
                 va='center', ha='left', fontsize=10, fontweight='bold', color='#c0392b')
                 
-        # Also print the raw numbers inside the bar if possible, or below
-        ax.text(ax.get_xlim()[1]*0.01, bar.get_y() + bar.get_height()/2,
-                f"{int(comp):,} casos em {int(dose):,} doses".replace(',', '.'),
-                va='center', ha='left', fontsize=9, color='white' if bar.get_width() > ax.get_xlim()[1]*0.2 else 'black')
+        # Absolute numbers
+        if bar.get_width() > xlim_max * 0.4:
+            # Bar is very long, put text inside the bar (left aligned)
+            ax.text(xlim_max * 0.01, bar.get_y() + bar.get_height()/2,
+                    f"{int(comp):,} casos em {int(dose):,} doses".replace(',', '.'),
+                    va='center', ha='left', fontsize=9, color='white')
+        else:
+            # Bar is short, put text at the far right edge of the chart (right aligned)
+            ax.text(xlim_max * 0.99, bar.get_y() + bar.get_height()/2,
+                    f"{int(comp):,} casos em {int(dose):,} doses".replace(',', '.'),
+                    va='center', ha='right', fontsize=9, color='#7f8c8d')
 
     if anomaly_msg:
         fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
