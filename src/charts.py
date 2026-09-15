@@ -338,7 +338,7 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
     fig.legend(loc='upper center', bbox_to_anchor=(0.5, 0.90), ncol=2, frameon=False, fontsize=12)
     
     plt.suptitle(title, fontsize=16, fontweight='black', color='#2c3e50', y=0.98)
-    ax.set_title("O eixo Y está em escala logarítmica para evidenciar a grande diferença entre doses e casos", fontsize=10, color='#7f8c8d', style='italic', pad=30)
+    ax.set_title("As colunas vermelhas indicam o impacto absoluto (volume de casos). Não confunda a altura da barra com o risco (%),\npois uma vacina de risco ínfimo pode gerar mais casos se for aplicada em massa na população.", fontsize=10, color='#7f8c8d', style='italic', pad=30)
     
     
     if anomaly_msg:
