@@ -222,7 +222,7 @@ def main():
         else:
             df = pd.DataFrame(columns=['vaccine', 'co_sexo', 'co_racacor', 'age_group', 'total_doses'])
             
-        title = f"Perfil Demográfico da População Vacinada"
+        title = f"Perfil Demográfico das Doses Aplicadas"
         if args.search: title += f"\n[{', '.join(args.search)}]"
         if args.state: title += f" ({' '.join(args.state)})"
         if city_names: title += f" ({', '.join(city_names)})"
