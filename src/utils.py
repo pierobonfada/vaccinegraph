@@ -72,17 +72,5 @@ def padroniza_nome_vacina(nome):
     if re.search(r'\bHPV\b', nome): return 'HPV'
     if re.search(r'\bDTP\b', nome) and 'PENTA' not in nome: return 'DTP (Tríplice Bacteriana)'
     
-    
-    if 'SORO' in nome:
-        if 'RABICO' in nome or 'RÁBICO' in nome: return 'Soro Antirrábico'
-        if 'TETANICO' in nome or 'TETÂNICO' in nome: return 'Soro Antitetânico'
-        if 'BOTROPICO' in nome or 'BOTRÓPICO' in nome: return 'Soro Antibotrópico'
-        if 'CROTALICO' in nome or 'CROTÁLICO' in nome: return 'Soro Anticrotálico'
-        if 'ESCORPIONICO' in nome or 'ESCORPIÔNICO' in nome: return 'Soro Antiescorpiônico'
-        if 'ARACNIDICO' in nome or 'ARACNÍDICO' in nome: return 'Soro Antiaracnídico (Loxosceles, Phoneutria, Tityus)'
-        if 'ELAPIDICO' in nome or 'ELAPÍDICO' in nome: return 'Soro Antielapídico'
-        if 'BOTULINICO' in nome or 'BOTULÍNICO' in nome: return 'Soro Antibotulínico'
-        return 'Soro (Outros)'
-
     return nome.title()
 

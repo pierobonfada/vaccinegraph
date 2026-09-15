@@ -283,6 +283,9 @@ def main():
         sort_col = sort_col_map.get(args.sort, 'pct_complications')
         ascending = True if args.sort == 'least_complications' else False
         df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, until_terms=args.until, ascending=ascending)
+        if df_merged.empty:
+            eprint("Erro: A filtragem resultou em um grafico vazio. Tente ajustar os parametros (ex: --only).")
+            sys.exit(1)
         state_str = f" (UF: {' '.join(args.state)})" if args.state else " (Brasil)"
         if args.chart == 'complications':
             title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
