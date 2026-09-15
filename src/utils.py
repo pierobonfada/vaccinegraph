@@ -54,9 +54,10 @@ def padroniza_nome_vacina(nome):
         
     if 'HAEMOPHILUS' in nome: return 'Haemophilus influenzae b (Hib)'
     if 'POLIO' in nome and 'ORAL' in nome: return 'Poliomielite Oral (VOP)'
-    if 'VOP' in nome: return 'Poliomielite Oral (VOP)'
+    import re
+    if re.search(r'\bVOP\b', nome): return 'Poliomielite Oral (VOP)'
     if 'POLIO' in nome: return 'Poliomielite Inativada (VIP)'
-    if 'VIP' in nome: return 'Poliomielite Inativada (VIP)'
+    if re.search(r'\bVIP\b', nome): return 'Poliomielite Inativada (VIP)'
     if 'HEPATITE B' in nome: return 'Hepatite B'
     if 'HEPATITE A' in nome: return 'Hepatite A'
     if 'FEBRE AMARELA' in nome: return 'Febre Amarela'
@@ -66,10 +67,10 @@ def padroniza_nome_vacina(nome):
     if 'TRÍPLICE VIRAL' in nome or 'SARAMPO' in nome: return 'Tríplice Viral (SCR)'
     if 'PNEUMO' in nome: return 'Pneumocócica'
     if 'MENING' in nome: return 'Meningocócica'
-    if 'BCG' in nome: return 'BCG'
+    if re.search(r'\bBCG\b', nome): return 'BCG'
     if 'ROTAV' in nome: return 'Vacina Rotavírus'
-    if 'HPV' in nome: return 'HPV'
-    if 'DTP' in nome and 'PENTA' not in nome: return 'DTP (Tríplice Bacteriana)'
+    if re.search(r'\bHPV\b', nome): return 'HPV'
+    if re.search(r'\bDTP\b', nome) and 'PENTA' not in nome: return 'DTP (Tríplice Bacteriana)'
     
     return nome.title()
 
