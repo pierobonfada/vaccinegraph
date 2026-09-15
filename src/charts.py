@@ -349,3 +349,42 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
         
     handle_output(fig, output_file)
 
+
+
+def generate_risk_chart(df, title, output_file=None, anomaly_msg=None):
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    # We invert so highest is at the top of a horizontal bar chart
+    df = df.iloc[::-1].reset_index(drop=True)
+    
+    colors = ['#c0392b' if c else '#34495e' for c in df.get('is_searched', pd.Series([False]*len(df)))]
+    
+    bars = ax.barh(df['vaccine'], df['pct_complications'], color=colors)
+    
+    ax.set_title(title, fontsize=14, pad=20, fontweight='black', color='#2c3e50')
+    ax.set_xlabel('Taxa de Complicações (%)', fontsize=12)
+    
+    # Format x-axis as percentage with many decimals since risks are tiny
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, pos: f'{x:.4f}%'))
+    
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    # Add text labels on the bars
+    for bar, pct, dose, comp in zip(bars, df['pct_complications'], df['total_doses'], df['total_complications']):
+        ax.text(bar.get_width() + (ax.get_xlim()[1]*0.01), bar.get_y() + bar.get_height()/2,
+                f'{pct:.4f}%',
+                va='center', ha='left', fontsize=10, fontweight='bold', color='#c0392b')
+                
+        # Also print the raw numbers inside the bar if possible, or below
+        ax.text(ax.get_xlim()[1]*0.01, bar.get_y() + bar.get_height()/2,
+                f"{int(comp):,} casos em {int(dose):,} doses".replace(',', '.'),
+                va='center', ha='left', fontsize=9, color='white' if bar.get_width() > ax.get_xlim()[1]*0.2 else 'black')
+
+    if anomaly_msg:
+        fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
+        plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    else:
+        plt.tight_layout(rect=[0, 0.02, 1, 0.95])
+        
+    handle_output(fig, output_file)

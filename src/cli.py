@@ -19,7 +19,7 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     
-    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications', 'infographic'], default='doses', 
+    parser.add_argument('--chart', type=str, choices=['doses', 'people', 'timeline', 'total_yearly', 'monthly', 'profile', 'complications', 'risk', 'infographic'], default='doses', 
                         help="Define qual gráfico gerar:\
 "
                              " - doses: Vacinas mais aplicadas (Total de Doses)\
@@ -36,7 +36,8 @@ def main():
 "
                              " - complications: Taxa de complicações (SI-PNI vs VigiMed)\
 "
-                             " - infographic: Infográfico completo de complicações para UMA vacina específica (use --search)")
+                             " - risk: Risco Relativo (% de compl. por dose)\n"
+                             " - infographic: Infografico completo (use --search)")
                              
     parser.add_argument('--start-year', type=int, default=2023, help="Ano inicial da análise (Mínimo: 2023).")
     current_year = datetime.date.today().year
@@ -228,7 +229,7 @@ def main():
         if city_names: title += f" ({', '.join(city_names)})"
         
         generate_profile_chart(df, title, output_file=args.output)
-    elif args.chart == 'complications':
+    elif args.chart in ['complications', 'risk']:
         all_dfs = []
         for y in range(start, end + 1):
             df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode='doses')
@@ -279,10 +280,16 @@ def main():
         ascending = True if args.sort == 'least_complications' else False
         df_merged = apply_filters_and_highlights(df_merged, sort_col, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, until_terms=args.until, ascending=ascending)
         state_str = f" (UF: {' '.join(args.state)})" if args.state else " (Brasil)"
-        title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
-        title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
-        
-        generate_complications_chart(df_merged, title, output_file=args.output, anomaly_msg=anomaly_msg)
+        if args.chart == 'complications':
+            title = f"Doses Aplicadas vs Complicações Notificadas{state_str}"
+            title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
+            generate_complications_chart(df_merged, title, output_file=args.output, anomaly_msg=anomaly_msg)
+        else:
+            from src.charts import generate_risk_chart
+            title = f"Ranking de Risco Relativo (% de Complicações){state_str}"
+            title += f"\nFiltro de Gravidade: {args.severity.upper()} | Ordenacao: {args.sort}"
+            generate_risk_chart(df_merged, title, output_file=args.output, anomaly_msg=anomaly_msg)
+            
     elif args.chart == 'infographic':
         if not args.search:
             eprint("ERRO: Para o infográfico, você deve especificar uma vacina usando --search")
