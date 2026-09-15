@@ -225,6 +225,10 @@ def get_vigimed_data(severity, states=None, start_year=None, end_year=None):
     elif severity == 'death':
         df_raw = df_raw[df_raw['DESFECHO'].str.contains('óbito|obito|fatal', case=False, na=False)]
         
+    if start_year and end_year:
+        df_raw['sys_year'] = df_raw['DATA_INCLUSAO_SISTEMA'].str[6:10].astype(float)
+        df_raw = df_raw[(df_raw['sys_year'] >= start_year) & (df_raw['sys_year'] <= end_year)]
+
     df_raw = df_raw.rename(columns={'NOME_MEDICAMENTO_WHODRUG': 'ds_imuno'})
     df_raw = df_raw.dropna(subset=['ds_imuno'])
     
