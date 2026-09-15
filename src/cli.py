@@ -466,3 +466,32 @@ def main():
         
         from src.charts import generate_dashboard_infographic
         generate_dashboard_infographic(data, output_file=args.output)
+
+    elif args.chart in ['doses', 'people']:
+        all_dfs = []
+        for y in range(start, end + 1):
+            mode = 'cobertura' if args.chart == 'people' else 'doses'
+            df_y = update_modern_data(y, args.update, states=args.state, cities=args.city, mode=mode)
+            if not df_y.empty:
+                all_dfs.append(df_y)
+            
+        if all_dfs:
+            df = pd.concat(all_dfs)
+            df = df.groupby('vaccine').sum(numeric_only=True).reset_index()
+        else:
+            df = pd.DataFrame(columns=['vaccine', 'total_doses'])
+            
+        label_year = f"{start}-{end}" if start != end else str(start)
+        state_label = f" ({' '.join(args.state)})" if args.state else ""
+        
+        if args.chart == 'doses':
+            generate_doses_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, output_file=args.output)
+        elif args.chart == 'people':
+            generate_people_chart(df, label_year, search_terms=args.search, top_n=args.top, bottom_n=args.bottom, exclude_terms=args.exclude, only_terms=args.only, output_file=args.output)
+
+    else:
+        eprint(f"ERRO: Grafico '{args.chart}' nao implementado ou argumento invalido.")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
