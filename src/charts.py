@@ -138,7 +138,7 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
     ax_dem_age = fig.add_subplot(gs[1, 2])
     plot_barh(ax_dem_age, res['demographics']['age'], '#16a085', 'Faixa Etária (VigiMed)')
 
-    plt.tight_layout(rect=[0, 0.06, 1, 0.88])
+    plt.tight_layout(rect=[0, 0.06, 1, 0.85])
     handle_output(fig, output_file)
 
 def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None, until_terms=None):
@@ -349,7 +349,7 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
         fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
         plt.tight_layout(rect=[0, 0.05, 1, 0.88])
     else:
-        plt.tight_layout(rect=[0, 0.06, 1, 0.88])
+        plt.tight_layout(rect=[0, 0.06, 1, 0.85])
         
     handle_output(fig, output_file)
 
