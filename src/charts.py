@@ -54,6 +54,7 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
     comps_str = f'{int(total_comps):,}'.replace(',', '.')
     
     fig.text(0.5, 0.91, f"Total de Doses Aplicadas (SI-PNI): {doses_str} | Notificações VigiMed: {comps_str} ({pct:.6f}%)", ha='center', fontsize=14, color='#7f8c8d')
+    if res.get('vigimed_warning'): fig.text(0.5, 0.88, res['vigimed_warning'], ha='center', fontsize=12, fontweight='bold', color='#e67e22')
 
 
     if res.get('total_obitos', 0) > 0:
