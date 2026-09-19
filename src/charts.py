@@ -431,6 +431,7 @@ def generate_dashboard_infographic(data, output_file=None):
     if data['total_doses'] > 0:
         risk = (data['complications_severe'] / data['total_doses']) * 100
         ax_kpi.text(0.5, -0.2, f"Risco Relativo (Graves/Dose): {risk:.6f}%", fontsize=14, fontweight='bold', color='#c0392b', ha='center', va='center')
+    if data.get('vigimed_warning'): ax_kpi.text(0.5, -0.4, data['vigimed_warning'], fontsize=12, fontweight='bold', color='#e67e22', ha='center', va='center')
 
     # --- ROW 2 COL 1: Anual ---
     ax_ano = fig.add_subplot(gs[1, 0])

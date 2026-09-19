@@ -145,6 +145,25 @@ def main():
     if start < 2023:
         eprint("ERRO: O periodo inicial eh anterior a 2023. O sistema so possui dados brutos a partir de 2023.")
         sys.exit(1)
+        
+    city_states = []
+    if args.city:
+        
+        for c in args.city:
+            _, display_name = resolve_city_name(c)
+            if "-" in display_name:
+                uf = display_name.split("-")[-1]
+                if not args.state:
+                    args.state = []
+                if uf not in args.state:
+                    args.state.append(uf)
+                if uf not in city_states:
+                    city_states.append(uf)
+                    
+    vigimed_warning = ""
+    if city_states:
+        vigimed_warning = f"Atenção: O VigiMed não registra municípios. Exibindo notificações a nível Estadual ({', '.join(city_states)})."
+
     
     if args.chart == 'timeline':
         timeline_data = {}
@@ -353,6 +372,7 @@ def main():
         
         res = {
             'vaccine_name': vaccine_name,
+            'vigimed_warning': vigimed_warning,
             'total_obitos': int(is_death.sum()),
             'counts': {
                 'Graves (incl. Óbitos)': int(is_severe.sum()),
@@ -456,6 +476,7 @@ def main():
         
         data = {
             'vaccine_name': vaccine_name,
+            'vigimed_warning': vigimed_warning,
             'total_doses': total_doses,
             'total_people': total_people,
             'complications_severe': int(is_severe.sum()),
