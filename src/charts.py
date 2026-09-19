@@ -43,7 +43,7 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
         eprint("Nenhuma notificacao encontrada para esta vacina.")
         sys.exit(1)
         
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(16, 11))
     fig.patch.set_facecolor('#f4f6f9')
 
     plt.suptitle(f"INFOGRÁFICO DE SEGURANÇA: {res['vaccine_name'].upper()}", fontsize=22, fontweight='black', color='#2c3e50', y=0.96)
@@ -54,7 +54,7 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
     comps_str = f'{int(total_comps):,}'.replace(',', '.')
     
     fig.text(0.5, 0.91, f"Total de Doses Aplicadas (SI-PNI): {doses_str} | Notificações VigiMed: {comps_str} ({pct:.6f}%)", ha='center', fontsize=14, color='#7f8c8d')
-    if res.get('vigimed_warning'): fig.text(0.5, 0.88, res['vigimed_warning'], ha='center', fontsize=12, fontweight='bold', color='#e67e22')
+    if res.get('vigimed_warning'): fig.text(0.5, 0.86, res['vigimed_warning'], ha='center', fontsize=12, fontweight='bold', color='#e67e22')
 
 
     if res.get('total_obitos', 0) > 0:
@@ -138,7 +138,7 @@ def generate_symptoms_chart(res, total_doses, output_file=None):
     ax_dem_age = fig.add_subplot(gs[1, 2])
     plot_barh(ax_dem_age, res['demographics']['age'], '#16a085', 'Faixa Etária (VigiMed)')
 
-    plt.tight_layout(rect=[0, 0.06, 1, 0.85])
+    plt.tight_layout(rect=[0, 0.06, 1, 0.82])
     handle_output(fig, output_file)
 
 def generate_doses_chart(df, year, output_file=None, search_terms=None, top_n=None, bottom_n=None, exclude_terms=None, only_terms=None, until_terms=None):
@@ -349,7 +349,7 @@ def generate_complications_chart(df, title, output_file=None, anomaly_msg=""):
         fig.text(0.5, 0.02, anomaly_msg, ha='center', va='bottom', fontsize=9, color='#c0392b', fontweight='bold', style='italic', bbox=dict(facecolor='#f8d7da', edgecolor='#f5c6cb', boxstyle='round,pad=0.5', alpha=0.8))
         plt.tight_layout(rect=[0, 0.05, 1, 0.88])
     else:
-        plt.tight_layout(rect=[0, 0.06, 1, 0.85])
+        plt.tight_layout(rect=[0, 0.06, 1, 0.82])
         
     handle_output(fig, output_file)
 
@@ -410,7 +410,7 @@ def generate_dashboard_infographic(data, output_file=None):
     fig.patch.set_facecolor('#f8f9fa')
     
     # Define grid: 3 rows, 2 columns
-    gs = fig.add_gridspec(3, 2, height_ratios=[1, 1.5, 1.5], hspace=0.4, wspace=0.3)
+    gs = fig.add_gridspec(3, 2, height_ratios=[1, 1.5, 1.5], hspace=0.6, wspace=0.3)
     
     # --- ROW 1: KPIs ---
     ax_kpi = fig.add_subplot(gs[0, :])
